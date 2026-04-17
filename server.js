@@ -333,7 +333,8 @@ const startServer = async () => {
             'http://localhost:3000',
             'http://localhost:5000',
             'https://films-hub.vercel.app',
-            'https://skyblue-armadillo-710430.hostingersite.com',
+            'https://gray-tapir-174741.hostingersite.com',
+            'https://olivedrab-chough-505005.hostingersite.com',
             process.env.CORS_ORIGIN,
             process.env.CLIENT_URL
         ].filter(Boolean);
