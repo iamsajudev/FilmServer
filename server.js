@@ -468,6 +468,7 @@ const startServer = async () => {
         // ==================== USER PROFILE ROUTES ====================
 
         // Get current user profile
+        // Get current user profile
         app.get('/api/users/profile', authMiddleware, async (req, res) => {
             try {
                 const user = await User.findById(req.user._id).select('-password');
@@ -499,12 +500,14 @@ const startServer = async () => {
                         facebook: '',
                         linkedin: '',
                         instagram: '',
-                        vimeo: ''
+                        vimeo: '',
+                        github: '',
+                        youtube: ''
                     },
                     skills: user.skills || [],
                     experience: (user.experience || []).map(exp => ({
-                        title: exp.title,
-                        company: exp.company,
+                        title: exp.title || '',
+                        company: exp.company || '',
                         period: exp.period || '',
                         description: exp.description || ''
                     })),
@@ -513,7 +516,9 @@ const startServer = async () => {
                         projects: 0,
                         submissions: 0,
                         selections: 0,
-                        awards: 0
+                        awards: 0,
+                        followers: 0,
+                        following: 0
                     }
                 };
 
@@ -533,40 +538,96 @@ const startServer = async () => {
 
         // Update current user profile
         app.put('/api/users/profile', authMiddleware, async (req, res) => {
+            console.log('\n=== PROFILE UPDATE REQUEST ===');
+            console.log('User ID:', req.user?._id);
+            console.log('User Email:', req.user?.email);
+            console.log('Request headers:', req.headers);
+            console.log('Request body keys:', Object.keys(req.body));
+            console.log('Full request body:', JSON.stringify(req.body, null, 2));
+
             try {
+                // First, get the current user
+                const currentUser = await User.findById(req.user._id);
+
+                if (!currentUser) {
+                    console.log('User not found in database');
+                    return res.status(404).json({
+                        success: false,
+                        message: 'User not found'
+                    });
+                }
+
+                console.log('Current user found:', currentUser.email);
+
                 const updates = req.body;
                 const updateData = { updatedAt: Date.now() };
 
                 // Map frontend fields to backend schema
-                const fieldMappings = ['fullName', 'name', 'username', 'title', 'bio', 'location', 'email', 'phone', 'website', 'skills', 'experience', 'education'];
+                const fieldMappings = ['fullName', 'name', 'username', 'title', 'bio', 'location', 'email', 'phone', 'website'];
                 fieldMappings.forEach(field => {
-                    if (updates[field] !== undefined) updateData[field] = updates[field];
+                    if (updates[field] !== undefined) {
+                        updateData[field] = updates[field];
+                        console.log(`Updating ${field}:`, updates[field]);
+                    }
                 });
 
-                // Handle socials
-                if (updates.socials) updateData.socialMedia = updates.socials;
-                if (updates.socialMedia) updateData.socialMedia = updates.socialMedia;
+                // Handle skills separately
+                if (updates.skills !== undefined) {
+                    updateData.skills = Array.isArray(updates.skills) ? updates.skills : [];
+                    console.log('Updating skills:', updateData.skills);
+                }
 
-                // Handle images
-                if (updates.avatar) {
+                // Handle experience separately
+                if (updates.experience !== undefined) {
+                    updateData.experience = Array.isArray(updates.experience) ? updates.experience : [];
+                    console.log('Updating experience count:', updateData.experience.length);
+                }
+
+                // Handle socials
+                if (updates.socials) {
+                    updateData.socialMedia = updates.socials;
+                    console.log('Updating social media:', Object.keys(updates.socials));
+                }
+                if (updates.socialMedia) {
+                    updateData.socialMedia = updates.socialMedia;
+                    console.log('Updating social media from socialMedia field');
+                }
+
+                // Handle images (only log, don't log full base64)
+                if (updates.avatar && updates.avatar.startsWith('data:image')) {
                     updateData.avatar = updates.avatar;
                     updateData.profileImage = updates.avatar;
+                    console.log('Updating avatar image (base64 length:', updates.avatar.length, ')');
                 }
-                if (updates.profileImage) {
+                if (updates.profileImage && updates.profileImage.startsWith('data:image')) {
                     updateData.profileImage = updates.profileImage;
                     updateData.avatar = updates.profileImage;
+                    console.log('Updating profileImage (base64 length:', updates.profileImage.length, ')');
                 }
-                if (updates.coverPhoto) updateData.coverPhoto = updates.coverPhoto;
+                if (updates.coverPhoto && updates.coverPhoto.startsWith('data:image')) {
+                    updateData.coverPhoto = updates.coverPhoto;
+                    console.log('Updating coverPhoto (base64 length:', updates.coverPhoto.length, ')');
+                }
 
                 // Handle stats
                 if (updates.stats) {
-                    const currentUser = await User.findById(req.user._id);
-                    updateData.stats = { ...currentUser.stats, ...updates.stats };
+                    updateData.stats = {
+                        projects: currentUser.stats?.projects || 0,
+                        submissions: currentUser.stats?.submissions || 0,
+                        selections: currentUser.stats?.selections || 0,
+                        awards: currentUser.stats?.awards || 0,
+                        followers: currentUser.stats?.followers || 0,
+                        following: currentUser.stats?.following || 0,
+                        views: currentUser.stats?.views || 0,
+                        ...updates.stats
+                    };
+                    console.log('Updating stats:', updateData.stats);
                 }
 
                 // Handle password change
                 if (updates.password && updates.password.trim() !== '') {
                     if (updates.password.length < 6) {
+                        console.log('Password too short');
                         return res.status(400).json({
                             success: false,
                             message: 'Password must be at least 6 characters'
@@ -575,7 +636,17 @@ const startServer = async () => {
                     const salt = await bcrypt.genSalt(10);
                     updateData.password = await bcrypt.hash(updates.password, salt);
                     updateData.passwordChangedAt = Date.now();
+                    console.log('Password updated');
                 }
+
+                // Remove undefined fields
+                Object.keys(updateData).forEach(key => {
+                    if (updateData[key] === undefined) {
+                        delete updateData[key];
+                    }
+                });
+
+                console.log('Final update data keys:', Object.keys(updateData));
 
                 const user = await User.findByIdAndUpdate(
                     req.user._id,
@@ -584,11 +655,14 @@ const startServer = async () => {
                 ).select('-password');
 
                 if (!user) {
+                    console.log('Failed to update user');
                     return res.status(404).json({
                         success: false,
-                        message: 'User not found'
+                        message: 'User not found after update'
                     });
                 }
+
+                console.log('User updated successfully:', user.email);
 
                 // Format response
                 const profileData = {
@@ -602,14 +676,22 @@ const startServer = async () => {
                     email: user.email,
                     phone: user.phone,
                     website: user.website,
-                    avatar: user.avatar || user.profileImage,
-                    coverPhoto: user.coverPhoto,
-                    socials: user.socialMedia,
-                    skills: user.skills,
-                    experience: user.experience,
-                    education: user.education,
-                    stats: user.stats
+                    avatar: user.avatar || user.profileImage || '',
+                    coverPhoto: user.coverPhoto || '',
+                    socials: user.socialMedia || {},
+                    skills: user.skills || [],
+                    experience: user.experience || [],
+                    education: user.education || [],
+                    stats: user.stats || {
+                        projects: 0,
+                        submissions: 0,
+                        selections: 0,
+                        awards: 0
+                    },
+                    joined: user.createdAt
                 };
+
+                console.log('Sending success response');
 
                 res.json({
                     success: true,
@@ -617,11 +699,17 @@ const startServer = async () => {
                     user: profileData,
                     data: profileData
                 });
+
             } catch (error) {
-                console.error('Update profile error:', error);
+                console.error('=== UPDATE PROFILE ERROR ===');
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+
                 res.status(500).json({
                     success: false,
-                    message: 'Error updating profile'
+                    message: error.message || 'Error updating profile',
+                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
                 });
             }
         });

@@ -457,13 +457,13 @@ userSchema.pre('save', function(next) {
     };
     this.stats = { ...defaultStats, ...this.stats };
     
-    next();
+    // next();
 });
 
 // Pre-update middleware
 userSchema.pre('findOneAndUpdate', function(next) {
     this.set({ updatedAt: new Date() });
-    next();
+    // next();
 });
 
 module.exports = mongoose.model('User', userSchema);

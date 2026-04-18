@@ -39,17 +39,15 @@ const updateCurrentUserProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
-    console.log("Received update data:", req.body);
+    console.log('Received update data:', req.body);
 
-    // Update basic fields
+    // Update basic fields - safely check each field
     if (req.body.fullName !== undefined) user.fullName = req.body.fullName;
     if (req.body.name !== undefined) user.name = req.body.name;
-    if (req.body.firstName !== undefined) user.firstName = req.body.firstName;
-    if (req.body.lastName !== undefined) user.lastName = req.body.lastName;
     if (req.body.username !== undefined) user.username = req.body.username;
     if (req.body.title !== undefined) user.title = req.body.title;
     if (req.body.bio !== undefined) user.bio = req.body.bio;
@@ -58,113 +56,104 @@ const updateCurrentUserProfile = async (req, res) => {
     if (req.body.phone !== undefined) user.phone = req.body.phone;
     if (req.body.website !== undefined) user.website = req.body.website;
 
-    // Update personal information
-    if (req.body.gender !== undefined) user.gender = req.body.gender;
-    if (req.body.pronouns !== undefined) user.pronouns = req.body.pronouns;
-    if (req.body.customPronouns !== undefined) user.customPronouns = req.body.customPronouns;
-    if (req.body.birthdate !== undefined) user.birthdate = req.body.birthdate;
-
-    // Update preferences
-    if (req.body.timezone !== undefined) user.timezone = req.body.timezone;
-    if (req.body.currency !== undefined) user.currency = req.body.currency;
-
-    // Update address fields
-    if (req.body.address) {
-      if (typeof req.body.address === 'object') {
-        user.address = {
-          ...user.address,
-          ...req.body.address
-        };
-      }
-    }
-    
-    // Flat address fields (alternative to nested object)
-    if (req.body.street !== undefined) user.address.street = req.body.street;
-    if (req.body.apartment !== undefined) user.address.apartment = req.body.apartment;
-    if (req.body.city !== undefined) user.address.city = req.body.city;
-    if (req.body.state !== undefined) user.address.state = req.body.state;
-    if (req.body.zipCode !== undefined) user.address.zipCode = req.body.zipCode;
-    if (req.body.country !== undefined) user.address.country = req.body.country;
-
     // Update social media
     if (req.body.socialMedia !== undefined) {
       user.socialMedia = {
         ...user.socialMedia,
-        ...req.body.socialMedia,
+        ...req.body.socialMedia
       };
     }
 
     // Update skills
     if (req.body.skills !== undefined) {
-      user.skills = req.body.skills;
+      user.skills = Array.isArray(req.body.skills) ? req.body.skills : [];
     }
 
     // Update experience
     if (req.body.experience !== undefined) {
-      user.experience = req.body.experience;
+      user.experience = Array.isArray(req.body.experience) ? req.body.experience : [];
     }
 
     // Update stats
     if (req.body.stats !== undefined) {
       user.stats = {
         ...user.stats,
-        ...req.body.stats,
+        ...req.body.stats
       };
     }
 
-    // Update preferences
-    if (req.body.preferences !== undefined) {
-      user.preferences = {
-        ...user.preferences,
-        ...req.body.preferences,
-      };
-    }
-
-    // Handle profile image (base64)
-    if (req.body.profileImage && req.body.profileImage.startsWith("data:image")) {
+    // Handle profile image
+    if (req.body.profileImage !== undefined && req.body.profileImage.startsWith('data:image')) {
       user.profileImage = req.body.profileImage;
       user.avatar = req.body.profileImage;
     }
 
+    if (req.body.avatar !== undefined && req.body.avatar.startsWith('data:image')) {
+      user.avatar = req.body.avatar;
+      user.profileImage = req.body.avatar;
+    }
+
     // Handle cover photo
-    if (req.body.coverPhoto && req.body.coverPhoto.startsWith("data:image")) {
+    if (req.body.coverPhoto !== undefined && req.body.coverPhoto.startsWith('data:image')) {
       user.coverPhoto = req.body.coverPhoto;
     }
 
-    // Handle email verification
-    if (req.body.isEmailVerified !== undefined) {
-      user.isEmailVerified = req.body.isEmailVerified;
-    }
-
     // Handle password update
-    if (req.body.password && req.body.password.trim() !== "") {
+    if (req.body.password && req.body.password.trim() !== '') {
       if (req.body.password.length < 6) {
         return res.status(400).json({
           success: false,
-          message: "Password must be at least 6 characters",
+          message: 'Password must be at least 6 characters'
         });
       }
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(req.body.password, salt);
+      user.passwordChangedAt = Date.now();
     }
 
     await user.save();
 
     // Return updated user without password
-    const updatedUser = await User.findById(req.user.id).select("-password");
+    const updatedUser = await User.findById(req.user.id).select('-password -__v');
 
-    console.log("Profile updated successfully for user:", updatedUser.email);
+    console.log('Profile updated successfully for user:', updatedUser.email);
+
+    // Format response for frontend
+    const profileData = {
+      id: updatedUser._id,
+      name: updatedUser.name || updatedUser.fullName || '',
+      fullName: updatedUser.fullName || updatedUser.name || '',
+      username: updatedUser.username || '',
+      title: updatedUser.title || '',
+      bio: updatedUser.bio || '',
+      location: updatedUser.location || '',
+      email: updatedUser.email || '',
+      phone: updatedUser.phone || '',
+      website: updatedUser.website || '',
+      joined: updatedUser.createdAt,
+      avatar: updatedUser.avatar || updatedUser.profileImage || '',
+      coverPhoto: updatedUser.coverPhoto || '',
+      socials: updatedUser.socialMedia || {},
+      skills: updatedUser.skills || [],
+      experience: updatedUser.experience || [],
+      education: updatedUser.education || [],
+      stats: updatedUser.stats || {
+        projects: 0, submissions: 0, selections: 0, awards: 0
+      }
+    };
 
     res.status(200).json({
       success: true,
-      data: updatedUser,
-      message: "Profile updated successfully",
+      message: 'Profile updated successfully',
+      data: profileData,
+      user: profileData
     });
+
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || "Server error while updating profile",
+      message: error.message || 'Server error while updating profile'
     });
   }
 };
