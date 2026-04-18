@@ -21,15 +21,16 @@ const userSchema = new mongoose.Schema({
     },
     username: {
         type: String,
-        unique: true,  // Keep only this one
+        unique: true,
         sparse: true,
         trim: true
     },
     email: {
         type: String,
         required: [true, 'Please add an email'],
-        unique: true,  // Keep only this one
-        lowercase: true
+        unique: true,
+        lowercase: true,
+        trim: true
     },
     password: {
         type: String,
@@ -141,37 +142,38 @@ const userSchema = new mongoose.Schema({
     
     // Skills & Experience
     skills: [{
-        type: String
+        type: String,
+        trim: true
     }],
     experience: [{
-        title: { type: String },
-        company: { type: String },
-        location: { type: String },
-        period: { type: String },
+        title: { type: String, trim: true },
+        company: { type: String, trim: true },
+        location: { type: String, trim: true },
+        period: { type: String, trim: true },
         startDate: { type: Date },
         endDate: { type: Date },
         current: { type: Boolean, default: false },
-        description: { type: String }
+        description: { type: String, trim: true }
     }],
     education: [{
-        degree: { type: String },
-        institution: { type: String },
-        location: { type: String },
-        year: { type: String },
+        degree: { type: String, trim: true },
+        institution: { type: String, trim: true },
+        location: { type: String, trim: true },
+        year: { type: String, trim: true },
         startYear: { type: Number },
         endYear: { type: Number },
-        description: { type: String }
+        description: { type: String, trim: true }
     }],
     
     // Statistics
     stats: {
-        projects: { type: Number, default: 0 },
-        submissions: { type: Number, default: 0 },
-        selections: { type: Number, default: 0 },
-        awards: { type: Number, default: 0 },
-        followers: { type: Number, default: 0 },
-        following: { type: Number, default: 0 },
-        views: { type: Number, default: 0 }
+        projects: { type: Number, default: 0, min: 0 },
+        submissions: { type: Number, default: 0, min: 0 },
+        selections: { type: Number, default: 0, min: 0 },
+        awards: { type: Number, default: 0, min: 0 },
+        followers: { type: Number, default: 0, min: 0 },
+        following: { type: Number, default: 0, min: 0 },
+        views: { type: Number, default: 0, min: 0 }
     },
     
     // Complete Address Information
@@ -210,12 +212,28 @@ const userSchema = new mongoose.Schema({
         pushNotifications: { type: Boolean, default: false },
         smsNotifications: { type: Boolean, default: false },
         marketingEmails: { type: Boolean, default: true },
-        language: { type: String, enum: ['en', 'bn', 'hi', 'ar', 'es', 'fr', 'de', 'zh'], default: 'en' },
+        language: { 
+            type: String, 
+            enum: ['en', 'bn', 'hi', 'ar', 'es', 'fr', 'de', 'zh'], 
+            default: 'en' 
+        },
         timezone: { type: String, default: 'Asia/Dhaka' },
-        dateFormat: { type: String, enum: ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], default: 'DD/MM/YYYY' },
-        theme: { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
+        dateFormat: { 
+            type: String, 
+            enum: ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], 
+            default: 'DD/MM/YYYY' 
+        },
+        theme: { 
+            type: String, 
+            enum: ['light', 'dark', 'system'], 
+            default: 'light' 
+        },
         privacy: {
-            profileVisibility: { type: String, enum: ['public', 'private', 'connections'], default: 'public' },
+            profileVisibility: { 
+                type: String, 
+                enum: ['public', 'private', 'connections'], 
+                default: 'public' 
+            },
             showEmail: { type: Boolean, default: false },
             showPhone: { type: Boolean, default: false },
             showLocation: { type: Boolean, default: true }
@@ -261,25 +279,46 @@ const userSchema = new mongoose.Schema({
     },
     loginAttempts: {
         type: Number,
-        default: 0
+        default: 0,
+        min: 0
     },
     lockUntil: {
         type: Date,
         default: null
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Index for better query performance
+// Indexes for better query performance
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
+userSchema.index({ 'stats.projects': -1 });
+userSchema.index({ 'stats.followers': -1 });
 
-// Virtual for full address
+// Compound indexes
+userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ createdAt: -1, isActive: 1 });
+
+// REMOVED: Virtual for fullName (already exists as real field)
+// Instead, create a virtual for displayName
+userSchema.virtual('displayName').get(function() {
+    if (this.fullName) return this.fullName;
+    if (this.name) return this.name;
+    if (this.firstName && this.lastName) return `${this.firstName} ${this.lastName}`;
+    return this.email.split('@')[0];
+});
+
+// Virtual for full address (no conflict)
 userSchema.virtual('fullAddress').get(function() {
     const parts = [];
     if (this.address.street) parts.push(this.address.street);
+    if (this.address.apartment) parts.push(this.address.apartment);
     if (this.address.city) parts.push(this.address.city);
     if (this.address.state) parts.push(this.address.state);
     if (this.address.zipCode) parts.push(this.address.zipCode);
@@ -287,7 +326,7 @@ userSchema.virtual('fullAddress').get(function() {
     return parts.join(', ');
 });
 
-// Virtual for age
+// Virtual for age (no conflict)
 userSchema.virtual('age').get(function() {
     if (!this.birthdate) return null;
     const today = new Date();
@@ -300,11 +339,36 @@ userSchema.virtual('age').get(function() {
     return age;
 });
 
+// Virtual for profile completion percentage (no conflict)
+userSchema.virtual('profileCompletion').get(function() {
+    let completed = 0;
+    const total = 15;
+    
+    if (this.name) completed++;
+    if (this.title) completed++;
+    if (this.bio) completed++;
+    if (this.location) completed++;
+    if (this.phone) completed++;
+    if (this.website) completed++;
+    if (this.profileImage) completed++;
+    if (this.coverPhoto) completed++;
+    if (this.skills && this.skills.length > 0) completed++;
+    if (this.experience && this.experience.length > 0) completed++;
+    if (this.education && this.education.length > 0) completed++;
+    if (this.socialMedia && Object.values(this.socialMedia).some(v => v)) completed++;
+    if (this.address.city) completed++;
+    if (this.birthdate) completed++;
+    if (this.gender !== 'Other') completed++;
+    
+    return Math.round((completed / total) * 100);
+});
+
 // Method to check if account is locked
 userSchema.methods.isLocked = function() {
     return !!(this.lockUntil && this.lockUntil > Date.now());
 };
 
+// Method to increment login attempts
 userSchema.methods.incrementLoginAttempts = async function() {
     if (this.lockUntil && this.lockUntil < Date.now()) {
         await this.updateOne({
@@ -314,10 +378,92 @@ userSchema.methods.incrementLoginAttempts = async function() {
     } else {
         const updates = { $inc: { loginAttempts: 1 } };
         if (this.loginAttempts + 1 >= 5) {
-            updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 }; // Lock for 2 hours
+            updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 };
         }
         await this.updateOne(updates);
     }
 };
+
+// Method to reset login attempts
+userSchema.methods.resetLoginAttempts = async function() {
+    await this.updateOne({
+        $set: { loginAttempts: 0 },
+        $unset: { lockUntil: 1 }
+    });
+};
+
+// Method to update last login
+userSchema.methods.updateLastLogin = async function(ip) {
+    this.lastLogin = new Date();
+    this.lastLoginIP = ip;
+    await this.save();
+};
+
+// Method to increment stats
+userSchema.methods.incrementStat = async function(statName, value = 1) {
+    if (this.stats[statName] !== undefined) {
+        this.stats[statName] += value;
+        await this.save();
+    }
+};
+
+// Method to add skill
+userSchema.methods.addSkill = async function(skill) {
+    if (!this.skills.includes(skill)) {
+        this.skills.push(skill);
+        await this.save();
+    }
+};
+
+// Method to remove skill
+userSchema.methods.removeSkill = async function(skill) {
+    this.skills = this.skills.filter(s => s !== skill);
+    await this.save();
+};
+
+// Method to add experience
+userSchema.methods.addExperience = async function(experience) {
+    this.experience.push(experience);
+    await this.save();
+};
+
+// Method to remove experience
+userSchema.methods.removeExperience = async function(index) {
+    this.experience.splice(index, 1);
+    await this.save();
+};
+
+// Pre-save middleware
+userSchema.pre('save', function(next) {
+    // Ensure name is set if fullName is provided
+    if (this.fullName && !this.name) {
+        this.name = this.fullName;
+    }
+    
+    // Ensure username is set if not provided
+    if (!this.username && this.email) {
+        this.username = this.email.split('@')[0];
+    }
+    
+    // Ensure stats object has all required fields
+    const defaultStats = {
+        projects: 0,
+        submissions: 0,
+        selections: 0,
+        awards: 0,
+        followers: 0,
+        following: 0,
+        views: 0
+    };
+    this.stats = { ...defaultStats, ...this.stats };
+    
+    next();
+});
+
+// Pre-update middleware
+userSchema.pre('findOneAndUpdate', function(next) {
+    this.set({ updatedAt: new Date() });
+    next();
+});
 
 module.exports = mongoose.model('User', userSchema);

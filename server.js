@@ -24,6 +24,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// ✅ Import the User model from models folder
+const User = require('./models/User');
+
 // ✅ MongoDB Connection Function
 const connectDB = async () => {
     try {
@@ -57,33 +60,9 @@ const connectDB = async () => {
         console.log('📊 Database:', mongoose.connection.db.databaseName);
         console.log('🔗 Host:', mongoose.connection.host);
 
-        // Handle connection events
-        mongoose.connection.on('error', (err) => {
-            console.error('❌ MongoDB connection error:', err);
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            console.log('⚠️ MongoDB disconnected, attempting to reconnect...');
-        });
-
-        mongoose.connection.on('reconnected', () => {
-            console.log('✅ MongoDB reconnected');
-        });
-
         return true;
     } catch (error) {
         console.error('❌ MongoDB Connection Error:', error.message);
-
-        if (error.message.includes('ECONNREFUSED') || error.message.includes('querySrv')) {
-            console.log('\n🔧 FIX: DNS or Network issue detected');
-            console.log('👉 Add 0.0.0.0/0 to MongoDB Atlas IP whitelist');
-            console.log('👉 Or use standard connection string instead of SRV:\n');
-            console.log('MONGODB_URI=mongodb://szamansaju_db_user:3FwWOBZdE1AMCQ8z@cluster0.ozzefdt.mongodb.net:27017/filmHhub?retryWrites=true&w=majority&ssl=true&authSource=admin');
-        } else if (error.message.includes('Authentication failed')) {
-            console.log('\n🔧 FIX: Wrong username or password');
-            console.log('👉 Check your MongoDB credentials\n');
-        }
-
         return false;
     }
 };
@@ -133,21 +112,8 @@ const adminMiddleware = (req, res, next) => {
     }
 };
 
-// ✅ Define Schemas
-const userSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
-    isActive: { type: Boolean, default: true },
-    isEmailVerified: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-// Project Schema (for user projects)
+// ✅ Define Other Schemas (Project, Film, Submission)
 const projectSchema = new mongoose.Schema({
-    // Basic fields
     title: { type: String, required: true },
     description: { type: String, required: true },
     category: { type: String, required: true },
@@ -161,7 +127,6 @@ const projectSchema = new mongoose.Schema({
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-
     // Step 1: Project Information - Additional fields
     hasNonEnglishTitle: { type: Boolean, default: false },
     nonEnglishTitle: { type: String, default: '' },
@@ -170,7 +135,6 @@ const projectSchema = new mongoose.Schema({
     twitter: { type: String, default: '' },
     facebook: { type: String, default: '' },
     instagram: { type: String, default: '' },
-
     // Step 2: Submitter Information
     submitterEmail: { type: String, default: '' },
     submitterPhone: { type: String, default: '' },
@@ -182,7 +146,6 @@ const projectSchema = new mongoose.Schema({
     submitterBirthDate: { type: String, default: '' },
     submitterGender: { type: String, default: '' },
     submitterPronouns: { type: String, default: '' },
-
     // Step 3: Credits
     directors: [{
         firstName: String,
@@ -209,7 +172,6 @@ const projectSchema = new mongoose.Schema({
         role: String,
         priorCredits: String
     }],
-
     // Step 4: Specifications
     projectTypes: [String],
     genres: { type: String, default: '' },
@@ -226,7 +188,6 @@ const projectSchema = new mongoose.Schema({
     filmColor: { type: String, default: 'Color' },
     studentProject: { type: String, default: 'No' },
     firstTimeFilmmaker: { type: String, default: 'No' },
-
     // Step 5: Screenings
     screenings: [{
         festivalName: String,
@@ -239,7 +200,6 @@ const projectSchema = new mongoose.Schema({
         contact: String,
         region: String
     }],
-
     // Payment
     paymentIntentId: { type: String, default: '' },
     submittedAt: { type: Date, default: Date.now }
@@ -270,8 +230,7 @@ const submissionSchema = new mongoose.Schema({
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
-// ✅ Register models
-const User = mongoose.models.User || mongoose.model('User', userSchema);
+// ✅ Register models (but NOT User - it's already imported)
 const Project = mongoose.models.Project || mongoose.model('Project', projectSchema);
 const Film = mongoose.models.Film || mongoose.model('Film', filmSchema);
 const Submission = mongoose.models.Submission || mongoose.model('Submission', submissionSchema);
@@ -287,6 +246,7 @@ const createAdminUser = async () => {
 
             const adminUser = new User({
                 name: process.env.ADMIN_NAME || 'Super Admin',
+                fullName: process.env.ADMIN_NAME || 'Super Admin',
                 email: adminEmail,
                 password: hashedPassword,
                 role: 'admin',
@@ -314,11 +274,6 @@ const startServer = async () => {
 
         if (!isConnected) {
             console.error('\n❌ Failed to connect to database. Exiting...');
-            console.log('💡 Troubleshooting:');
-            console.log('   1. Go to MongoDB Atlas → Network Access');
-            console.log('   2. Add IP: 0.0.0.0/0');
-            console.log('   3. Verify username/password in connection string');
-            console.log('   4. Check if database user has proper permissions\n');
             process.exit(1);
         }
 
@@ -398,11 +353,12 @@ const startServer = async () => {
                     });
                 }
 
-                const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 10);
+                const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(password, salt);
 
                 const user = new User({
                     name,
+                    fullName: name,
                     email: email.toLowerCase(),
                     password: hashedPassword,
                     role: 'user',
@@ -415,7 +371,7 @@ const startServer = async () => {
                 const token = jwt.sign(
                     { id: user._id, email: user.email, role: user.role },
                     process.env.JWT_SECRET || 'default_secret_key_change_this',
-                    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+                    { expiresIn: '7d' }
                 );
 
                 res.status(201).json({
@@ -433,8 +389,7 @@ const startServer = async () => {
                 console.error('Registration error:', error);
                 res.status(500).json({
                     success: false,
-                    message: 'Server error during registration',
-                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                    message: 'Server error during registration'
                 });
             }
         });
@@ -450,7 +405,7 @@ const startServer = async () => {
                     });
                 }
 
-                const user = await User.findOne({ email: email.toLowerCase() });
+                const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
                 if (!user) {
                     return res.status(401).json({
                         success: false,
@@ -476,7 +431,7 @@ const startServer = async () => {
                 const token = jwt.sign(
                     { id: user._id, email: user.email, role: user.role },
                     process.env.JWT_SECRET || 'default_secret_key_change_this',
-                    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+                    { expiresIn: '7d' }
                 );
 
                 res.json({
@@ -489,15 +444,16 @@ const startServer = async () => {
                         email: user.email,
                         role: user.role,
                         isActive: user.isActive,
-                        isEmailVerified: user.isEmailVerified
+                        isEmailVerified: user.isEmailVerified,
+                        avatar: user.avatar || user.profileImage,
+                        title: user.title
                     }
                 });
             } catch (error) {
                 console.error('Login error:', error);
                 res.status(500).json({
                     success: false,
-                    message: 'Server error during login',
-                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                    message: 'Server error during login'
                 });
             }
         });
@@ -509,111 +465,233 @@ const startServer = async () => {
             });
         });
 
-        // ==================== PAYMENT ROUTES ====================
+        // ==================== USER PROFILE ROUTES ====================
 
-        // Create Payment Intent endpoint
-        // Add this after your other routes and before the 404 handler
-        // ==================== PAYMENT ROUTES ====================
-
-        app.post('/api/payments/create-payment-intent', authMiddleware, async (req, res) => {
+        // Get current user profile
+        app.get('/api/users/profile', authMiddleware, async (req, res) => {
             try {
-                const { amount = 2500, currency = 'usd' } = req.body; // 2500 cents = $25.00
+                const user = await User.findById(req.user._id).select('-password');
 
-                console.log(`Creating payment intent for user ${req.user._id}: $${amount / 100} ${currency}`);
-
-                // Check if Stripe secret key is configured
-                if (!process.env.STRIPE_SECRET_KEY) {
-                    console.warn('⚠️ STRIPE_SECRET_KEY not set. Using mock payment.');
-                    // Return mock for testing
-                    return res.json({
-                        clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
-                        mock: true
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'User not found'
                     });
                 }
 
-                const Stripe = require('stripe');
-                const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-
-                const paymentIntent = await stripe.paymentIntents.create({
-                    amount: parseInt(amount),
-                    currency: currency,
-                    metadata: {
-                        userId: req.user._id.toString(),
-                        userEmail: req.user.email,
-                        projectType: req.body.projectType || 'unknown'
+                // Format the response to match frontend expectations
+                const profileData = {
+                    id: user._id,
+                    name: user.name || user.fullName || '',
+                    fullName: user.fullName || user.name || '',
+                    username: user.username || user.email.split('@')[0],
+                    title: user.title || 'Filmmaker',
+                    bio: user.bio || '',
+                    location: user.location || '',
+                    email: user.email,
+                    phone: user.phone || '',
+                    website: user.website || '',
+                    joined: user.createdAt,
+                    avatar: user.avatar || user.profileImage || '',
+                    coverPhoto: user.coverPhoto || '',
+                    socials: user.socialMedia || {
+                        twitter: '',
+                        facebook: '',
+                        linkedin: '',
+                        instagram: '',
+                        vimeo: ''
                     },
-                    automatic_payment_methods: {
-                        enabled: true,
-                    },
-                });
-
-                console.log(`✅ Payment intent created: ${paymentIntent.id}`);
+                    skills: user.skills || [],
+                    experience: (user.experience || []).map(exp => ({
+                        title: exp.title,
+                        company: exp.company,
+                        period: exp.period || '',
+                        description: exp.description || ''
+                    })),
+                    education: user.education || [],
+                    stats: user.stats || {
+                        projects: 0,
+                        submissions: 0,
+                        selections: 0,
+                        awards: 0
+                    }
+                };
 
                 res.json({
-                    clientSecret: paymentIntent.client_secret,
-                    paymentIntentId: paymentIntent.id,
-                    mock: false
+                    success: true,
+                    data: profileData,
+                    user: profileData
                 });
-
             } catch (error) {
-                console.error('❌ Payment intent error:', error.message);
-
-                // For development, return mock to allow testing
-                if (process.env.NODE_ENV === 'development') {
-                    console.log('⚠️ Using mock payment intent for development');
-                    res.json({
-                        clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
-                        mock: true,
-                        error: error.message
-                    });
-                } else {
-                    res.status(500).json({
-                        success: false,
-                        message: error.message || 'Failed to create payment intent'
-                    });
-                }
+                console.error('Get profile error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching profile'
+                });
             }
         });
 
-        // ==================== PROJECT ROUTES (ADDED FOR YOUR FRONTEND) ====================
+        // Update current user profile
+        app.put('/api/users/profile', authMiddleware, async (req, res) => {
+            try {
+                const updates = req.body;
+                const updateData = { updatedAt: Date.now() };
 
-        // Get user's own projects (for /api/projects/user/list)
+                // Map frontend fields to backend schema
+                const fieldMappings = ['fullName', 'name', 'username', 'title', 'bio', 'location', 'email', 'phone', 'website', 'skills', 'experience', 'education'];
+                fieldMappings.forEach(field => {
+                    if (updates[field] !== undefined) updateData[field] = updates[field];
+                });
+
+                // Handle socials
+                if (updates.socials) updateData.socialMedia = updates.socials;
+                if (updates.socialMedia) updateData.socialMedia = updates.socialMedia;
+
+                // Handle images
+                if (updates.avatar) {
+                    updateData.avatar = updates.avatar;
+                    updateData.profileImage = updates.avatar;
+                }
+                if (updates.profileImage) {
+                    updateData.profileImage = updates.profileImage;
+                    updateData.avatar = updates.profileImage;
+                }
+                if (updates.coverPhoto) updateData.coverPhoto = updates.coverPhoto;
+
+                // Handle stats
+                if (updates.stats) {
+                    const currentUser = await User.findById(req.user._id);
+                    updateData.stats = { ...currentUser.stats, ...updates.stats };
+                }
+
+                // Handle password change
+                if (updates.password && updates.password.trim() !== '') {
+                    if (updates.password.length < 6) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Password must be at least 6 characters'
+                        });
+                    }
+                    const salt = await bcrypt.genSalt(10);
+                    updateData.password = await bcrypt.hash(updates.password, salt);
+                    updateData.passwordChangedAt = Date.now();
+                }
+
+                const user = await User.findByIdAndUpdate(
+                    req.user._id,
+                    updateData,
+                    { new: true, runValidators: true }
+                ).select('-password');
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'User not found'
+                    });
+                }
+
+                // Format response
+                const profileData = {
+                    id: user._id,
+                    name: user.name || user.fullName || '',
+                    fullName: user.fullName || user.name || '',
+                    username: user.username,
+                    title: user.title,
+                    bio: user.bio,
+                    location: user.location,
+                    email: user.email,
+                    phone: user.phone,
+                    website: user.website,
+                    avatar: user.avatar || user.profileImage,
+                    coverPhoto: user.coverPhoto,
+                    socials: user.socialMedia,
+                    skills: user.skills,
+                    experience: user.experience,
+                    education: user.education,
+                    stats: user.stats
+                };
+
+                res.json({
+                    success: true,
+                    message: 'Profile updated successfully',
+                    user: profileData,
+                    data: profileData
+                });
+            } catch (error) {
+                console.error('Update profile error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error updating profile'
+                });
+            }
+        });
+
+        // Get user by ID (for viewing other profiles)
+        app.get('/api/users/:id', authMiddleware, async (req, res) => {
+            try {
+                const user = await User.findById(req.params.id)
+                    .select('-password -emailVerificationToken -passwordResetToken -twoFactorSecret -loginAttempts -lockUntil');
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'User not found'
+                    });
+                }
+
+                // Check privacy settings
+                const isOwner = req.user && req.user._id.toString() === user._id.toString();
+                const isAdmin = req.user && req.user.role === 'admin';
+
+                let profileData = {
+                    id: user._id,
+                    name: user.name || user.fullName,
+                    username: user.username,
+                    title: user.title,
+                    bio: user.bio,
+                    avatar: user.avatar || user.profileImage,
+                    coverPhoto: user.coverPhoto,
+                    skills: user.skills,
+                    stats: user.stats,
+                    joined: user.createdAt
+                };
+
+                // Only show contact info if profile is public or viewer is owner/admin
+                if (isOwner || isAdmin || user.preferences?.privacy?.profileVisibility === 'public') {
+                    profileData = {
+                        ...profileData,
+                        email: user.email,
+                        location: user.location,
+                        website: user.website,
+                        socials: user.socialMedia,
+                        experience: user.experience,
+                        education: user.education
+                    };
+                }
+
+                res.json({
+                    success: true,
+                    user: profileData
+                });
+            } catch (error) {
+                console.error('Get user by ID error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching user'
+                });
+            }
+        });
+
+        // ==================== PROJECT ROUTES ====================
+
+        // Get user's own projects
         app.get('/api/projects/user/list', authMiddleware, async (req, res) => {
             try {
-                const projects = await Project.find({ submittedBy: req.user._id })
-                    .sort({ createdAt: -1 });
-
-                res.json({
-                    success: true,
-                    count: projects.length,
-                    projects
-                });
+                const projects = await Project.find({ submittedBy: req.user._id }).sort({ createdAt: -1 });
+                res.json({ success: true, count: projects.length, projects });
             } catch (error) {
                 console.error('Get user projects error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching your projects'
-                });
-            }
-        });
-
-        // Get user's own projects (alias for /my-projects)
-        app.get('/api/projects/my-projects', authMiddleware, async (req, res) => {
-            try {
-                const projects = await Project.find({ submittedBy: req.user._id })
-                    .sort({ createdAt: -1 });
-
-                res.json({
-                    success: true,
-                    count: projects.length,
-                    projects
-                });
-            } catch (error) {
-                console.error('Get my projects error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching your projects'
-                });
+                res.status(500).json({ success: false, message: 'Error fetching your projects' });
             }
         });
 
@@ -622,7 +700,6 @@ const startServer = async () => {
             try {
                 const { status, category, page = 1, limit = 10 } = req.query;
                 const query = {};
-
                 if (status) query.status = status;
                 if (category) query.category = category;
 
@@ -643,68 +720,31 @@ const startServer = async () => {
                 });
             } catch (error) {
                 console.error('Get projects error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching projects'
-                });
-            }
-        });
-
-        // Get single project
-        app.get('/api/projects/:id', async (req, res) => {
-            try {
-                const project = await Project.findById(req.params.id)
-                    .populate('submittedBy', 'name email');
-
-                if (!project) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Project not found'
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    project
-                });
-            } catch (error) {
-                console.error('Get project error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching project'
-                });
+                res.status(500).json({ success: false, message: 'Error fetching projects' });
             }
         });
 
         // Create new project
-        // In your backend server.js, replace the project creation endpoint
         app.post('/api/projects', authMiddleware, async (req, res) => {
             try {
-                // Support both frontend and backend field names
                 let title, description, category, director;
 
-                // Check if using frontend format (projectTitle) or backend format (title)
                 if (req.body.projectTitle) {
-                    // Frontend format - Map all fields
                     title = req.body.projectTitle;
                     description = req.body.briefSynopsis;
                     category = req.body.projectType;
-
-                    // Get director from the directors array if available
                     if (req.body.directors && req.body.directors.length > 0) {
                         const firstDirector = req.body.directors[0];
                         director = `${firstDirector.firstName || ''} ${firstDirector.lastName || ''}`.trim();
                     }
                     if (!director) director = req.body.director || 'Not specified';
                 } else {
-                    // Backend format
                     title = req.body.title;
                     description = req.body.description;
                     category = req.body.category;
                     director = req.body.director;
                 }
 
-                // Validation
                 if (!title || !description || !category || !director) {
                     return res.status(400).json({
                         success: false,
@@ -712,15 +752,8 @@ const startServer = async () => {
                     });
                 }
 
-                // Create project with ALL fields from frontend
                 const project = new Project({
-                    // Basic required fields
-                    title,
-                    description,
-                    category,
-                    director,
-
-                    // Step 1: Project Information
+                    title, description, category, director,
                     hasNonEnglishTitle: req.body.hasNonEnglishTitle || false,
                     nonEnglishTitle: req.body.nonEnglishTitle || '',
                     nonEnglishSynopsis: req.body.nonEnglishSynopsis || '',
@@ -728,8 +761,6 @@ const startServer = async () => {
                     twitter: req.body.twitter || '',
                     facebook: req.body.facebook || '',
                     instagram: req.body.instagram || '',
-
-                    // Step 2: Submitter Information
                     submitterEmail: req.body.email || '',
                     submitterPhone: req.body.phone || '',
                     submitterAddress: req.body.address || '',
@@ -740,14 +771,10 @@ const startServer = async () => {
                     submitterBirthDate: req.body.birthDate || '',
                     submitterGender: req.body.gender || '',
                     submitterPronouns: req.body.pronouns || '',
-
-                    // Step 3: Credits
                     directors: req.body.directors || [],
                     writers: req.body.writers || [],
                     producers: req.body.producers || [],
                     keyCast: req.body.keyCast || [],
-
-                    // Step 4: Specifications
                     projectTypes: req.body.projectTypes || [],
                     genres: req.body.genres || '',
                     runtimeHours: req.body.runtimeHours || '00',
@@ -763,12 +790,8 @@ const startServer = async () => {
                     filmColor: req.body.filmColor || 'Color',
                     studentProject: req.body.studentProject || 'No',
                     firstTimeFilmmaker: req.body.firstTimeFilmmaker || 'No',
-
-                    // Step 5: Screenings
                     screenings: req.body.screenings || [],
                     distributors: req.body.distributors || [],
-
-                    // Payment info
                     paymentIntentId: req.body.paymentIntentId || '',
                     submittedAt: req.body.submittedAt || new Date().toISOString(),
                     submittedBy: req.user._id,
@@ -782,90 +805,9 @@ const startServer = async () => {
                     message: 'Project submitted successfully',
                     project
                 });
-
             } catch (error) {
                 console.error('Create project error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error creating project submission',
-                    error: error.message
-                });
-            }
-        });
-
-        // Update project
-        app.put('/api/projects/:id', authMiddleware, async (req, res) => {
-            try {
-                const project = await Project.findById(req.params.id);
-
-                if (!project) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Project not found'
-                    });
-                }
-
-                if (project.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'You can only update your own projects'
-                    });
-                }
-
-                const updates = req.body;
-                updates.updatedAt = Date.now();
-
-                const updatedProject = await Project.findByIdAndUpdate(
-                    req.params.id,
-                    updates,
-                    { new: true, runValidators: true }
-                );
-
-                res.json({
-                    success: true,
-                    message: 'Project updated successfully',
-                    project: updatedProject
-                });
-            } catch (error) {
-                console.error('Update project error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error updating project'
-                });
-            }
-        });
-
-        // Delete project
-        app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
-            try {
-                const project = await Project.findById(req.params.id);
-
-                if (!project) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Project not found'
-                    });
-                }
-
-                if (project.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'You can only delete your own projects'
-                    });
-                }
-
-                await Project.findByIdAndDelete(req.params.id);
-
-                res.json({
-                    success: true,
-                    message: 'Project deleted successfully'
-                });
-            } catch (error) {
-                console.error('Delete project error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error deleting project'
-                });
+                res.status(500).json({ success: false, message: 'Error creating project submission' });
             }
         });
 
@@ -878,27 +820,20 @@ const startServer = async () => {
                 version: '1.0.0',
                 environment: process.env.NODE_ENV || 'development',
                 endpoints: {
-                    health: 'GET /health',
                     auth: {
                         register: 'POST /api/auth/register',
                         login: 'POST /api/auth/login',
                         me: 'GET /api/auth/me'
                     },
+                    users: {
+                        profile: 'GET /api/users/profile',
+                        updateProfile: 'PUT /api/users/profile',
+                        getUserById: 'GET /api/users/:id'
+                    },
                     projects: {
                         list: 'GET /api/projects',
                         userList: 'GET /api/projects/user/list',
-                        myProjects: 'GET /api/projects/my-projects',
-                        create: 'POST /api/projects',
-                        getOne: 'GET /api/projects/:id',
-                        update: 'PUT /api/projects/:id',
-                        delete: 'DELETE /api/projects/:id'
-                    },
-                    films: {
-                        list: 'GET /api/films',
-                        create: 'POST /api/films',
-                        getOne: 'GET /api/films/:id',
-                        update: 'PUT /api/films/:id',
-                        delete: 'DELETE /api/films/:id'
+                        create: 'POST /api/projects'
                     }
                 }
             });
@@ -906,187 +841,12 @@ const startServer = async () => {
 
         app.get('/health', (req, res) => {
             const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-            const dbReadyState = {
-                0: 'disconnected',
-                1: 'connected',
-                2: 'connecting',
-                3: 'disconnecting'
-            };
-
             res.status(200).json({
                 success: true,
                 status: 'OK',
                 timestamp: new Date().toISOString(),
-                mongodb: {
-                    status: dbStatus,
-                    readyState: dbReadyState[mongoose.connection.readyState] || 'unknown',
-                    host: mongoose.connection.host || 'unknown',
-                    database: mongoose.connection.name || 'unknown'
-                },
-                uptime: process.uptime(),
-                environment: process.env.NODE_ENV || 'development',
-                memory: process.memoryUsage(),
-                nodeVersion: process.version
+                mongodb: { status: dbStatus }
             });
-        });
-
-        // ==================== FILM ROUTES ====================
-
-        app.get('/api/films', async (req, res) => {
-            try {
-                const { status, genre, page = 1, limit = 10 } = req.query;
-                const query = {};
-
-                if (status) query.submissionStatus = status;
-                if (genre) query.genre = genre;
-
-                const films = await Film.find(query)
-                    .populate('submittedBy', 'name email')
-                    .sort({ createdAt: -1 })
-                    .limit(limit * 1)
-                    .skip((page - 1) * limit);
-
-                const total = await Film.countDocuments(query);
-
-                res.json({
-                    success: true,
-                    films,
-                    totalPages: Math.ceil(total / limit),
-                    currentPage: page,
-                    total
-                });
-            } catch (error) {
-                console.error('Get films error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching films'
-                });
-            }
-        });
-
-        app.post('/api/films', async (req, res) => {
-            try {
-                const { title, director, year, duration, genre, description, posterUrl, trailerUrl } = req.body;
-
-                const token = req.headers.authorization?.split(' ')[1];
-                let userId = null;
-
-                if (token) {
-                    try {
-                        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_key_change_this');
-                        userId = decoded.id;
-                    } catch (e) {
-                        // Invalid token, continue without user
-                    }
-                }
-
-                const film = new Film({
-                    title,
-                    director,
-                    year,
-                    duration,
-                    genre,
-                    description,
-                    posterUrl,
-                    trailerUrl,
-                    submittedBy: userId,
-                    submissionStatus: 'pending'
-                });
-
-                await film.save();
-
-                res.status(201).json({
-                    success: true,
-                    message: 'Film submitted successfully',
-                    film
-                });
-            } catch (error) {
-                console.error('Create film error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error creating film submission'
-                });
-            }
-        });
-
-        app.get('/api/films/:id', async (req, res) => {
-            try {
-                const film = await Film.findById(req.params.id).populate('submittedBy', 'name email');
-
-                if (!film) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Film not found'
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    film
-                });
-            } catch (error) {
-                console.error('Get film error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error fetching film'
-                });
-            }
-        });
-
-        app.put('/api/films/:id', async (req, res) => {
-            try {
-                const updates = req.body;
-                updates.updatedAt = Date.now();
-
-                const film = await Film.findByIdAndUpdate(
-                    req.params.id,
-                    updates,
-                    { new: true, runValidators: true }
-                );
-
-                if (!film) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Film not found'
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    message: 'Film updated successfully',
-                    film
-                });
-            } catch (error) {
-                console.error('Update film error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error updating film'
-                });
-            }
-        });
-
-        app.delete('/api/films/:id', async (req, res) => {
-            try {
-                const film = await Film.findByIdAndDelete(req.params.id);
-
-                if (!film) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Film not found'
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    message: 'Film deleted successfully'
-                });
-            } catch (error) {
-                console.error('Delete film error:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error deleting film'
-                });
-            }
         });
 
         // ==================== ERROR HANDLERS ====================
@@ -1101,12 +861,10 @@ const startServer = async () => {
 
         app.use((err, req, res, next) => {
             console.error('❌ Error:', err.message);
-            console.error(err.stack);
-
             res.status(err.status || 500).json({
                 success: false,
                 message: err.message || 'Internal Server Error',
-                error: process.env.NODE_ENV === 'development' ? err.stack : 'Something went wrong'
+                error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
             });
         });
 
@@ -1118,10 +876,9 @@ const startServer = async () => {
             console.log(`✅ Server started successfully!`);
             console.log(`🚀 Running on port ${PORT}`);
             console.log(`📡 Local URL: http://localhost:${PORT}`);
-            console.log(`🔗 CORS enabled for: ${allowedOrigins.join(', ')}`);
             console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`💾 Database: ${mongoose.connection.name || 'connected'}`);
-            console.log(`📚 API Documentation: http://localhost:${PORT}`);
+            console.log(`✅ User profile routes available at /api/users/profile`);
             console.log('========================================\n');
         });
 
@@ -1139,14 +896,8 @@ const startServer = async () => {
         process.on('SIGTERM', gracefulShutdown);
         process.on('SIGINT', gracefulShutdown);
 
-        process.on('unhandledRejection', (err) => {
-            console.error('❌ Unhandled Rejection:', err);
-            gracefulShutdown();
-        });
-
     } catch (error) {
         console.error('❌ Failed to start server:', error.message);
-        console.error(error.stack);
         process.exit(1);
     }
 };
