@@ -332,9 +332,8 @@ const startServer = async () => {
         const allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:5000',
-            'https://films-hub.vercel.app',
-            'https://gray-tapir-174741.hostingersite.com',
-            'https://olivedrab-chough-505005.hostingersite.com',
+            'https://server.nybff.us',
+            'https://portals.nybff.us',
             process.env.CORS_ORIGIN,
             process.env.CLIENT_URL
         ].filter(Boolean);
