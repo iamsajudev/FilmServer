@@ -899,8 +899,187 @@ const startServer = async () => {
             }
         });
 
-        // ==================== HEALTH ROUTES ====================
+        // Get user's own projects (alias for /my-projects)
+        app.get('/api/projects/my-projects', authMiddleware, async (req, res) => {
+            try {
+                const projects = await Project.find({ submittedBy: req.user._id })
+                    .sort({ createdAt: -1 });
 
+                res.json({
+                    success: true,
+                    count: projects.length,
+                    projects
+                });
+            } catch (error) {
+                console.error('Get my projects error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching your projects'
+                });
+            }
+        });
+        // Get single project
+        app.get('/api/projects/:id', async (req, res) => {
+            try {
+                const project = await Project.findById(req.params.id)
+                    .populate('submittedBy', 'name email');
+
+                if (!project) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Project not found'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    project
+                });
+            } catch (error) {
+                console.error('Get project error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching project'
+                });
+            }
+        });
+        // Update project
+        app.put('/api/projects/:id', authMiddleware, async (req, res) => {
+            try {
+                const project = await Project.findById(req.params.id);
+
+                if (!project) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Project not found'
+                    });
+                }
+
+                if (project.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'You can only update your own projects'
+                    });
+                }
+
+                const updates = req.body;
+                updates.updatedAt = Date.now();
+
+                const updatedProject = await Project.findByIdAndUpdate(
+                    req.params.id,
+                    updates,
+                    { new: true, runValidators: true }
+                );
+
+                res.json({
+                    success: true,
+                    message: 'Project updated successfully',
+                    project: updatedProject
+                });
+            } catch (error) {
+                console.error('Update project error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error updating project'
+                });
+            }
+        });
+        // Delete project
+        app.delete('/api/projects/:id', authMiddleware, async (req, res) => {
+            try {
+                const project = await Project.findById(req.params.id);
+
+                if (!project) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Project not found'
+                    });
+                }
+
+                if (project.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'You can only delete your own projects'
+                    });
+                }
+
+                await Project.findByIdAndDelete(req.params.id);
+
+                res.json({
+                    success: true,
+                    message: 'Project deleted successfully'
+                });
+            } catch (error) {
+                console.error('Delete project error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error deleting project'
+                });
+            }
+        });
+        // ==================== PAYMENT ROUTES ====================
+
+        app.post('/api/payments/create-payment-intent', authMiddleware, async (req, res) => {
+            try {
+                const { amount = 2500, currency = 'usd' } = req.body; // 2500 cents = $25.00
+
+                console.log(`Creating payment intent for user ${req.user._id}: $${amount / 100} ${currency}`);
+
+                // Check if Stripe secret key is configured
+                if (!process.env.STRIPE_SECRET_KEY) {
+                    console.warn('⚠️ STRIPE_SECRET_KEY not set. Using mock payment.');
+                    // Return mock for testing
+                    return res.json({
+                        clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
+                        mock: true
+                    });
+                }
+
+                const Stripe = require('stripe');
+                const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: parseInt(amount),
+                    currency: currency,
+                    metadata: {
+                        userId: req.user._id.toString(),
+                        userEmail: req.user.email,
+                        projectType: req.body.projectType || 'unknown'
+                    },
+                    automatic_payment_methods: {
+                        enabled: true,
+                    },
+                });
+
+                console.log(`✅ Payment intent created: ${paymentIntent.id}`);
+
+                res.json({
+                    clientSecret: paymentIntent.client_secret,
+                    paymentIntentId: paymentIntent.id,
+                    mock: false
+                });
+
+            } catch (error) {
+                console.error('❌ Payment intent error:', error.message);
+
+                // For development, return mock to allow testing
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('⚠️ Using mock payment intent for development');
+                    res.json({
+                        clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
+                        mock: true,
+                        error: error.message
+                    });
+                } else {
+                    res.status(500).json({
+                        success: false,
+                        message: error.message || 'Failed to create payment intent'
+                    });
+                }
+            }
+        });
+
+        // ==================== HEALTH ROUTES ====================
         app.get('/', (req, res) => {
             res.status(200).json({
                 success: true,
@@ -937,6 +1116,164 @@ const startServer = async () => {
             });
         });
 
+        // ==================== FILM ROUTES ====================
+
+        app.get('/api/films', async (req, res) => {
+            try {
+                const { status, genre, page = 1, limit = 10 } = req.query;
+                const query = {};
+
+                if (status) query.submissionStatus = status;
+                if (genre) query.genre = genre;
+
+                const films = await Film.find(query)
+                    .populate('submittedBy', 'name email')
+                    .sort({ createdAt: -1 })
+                    .limit(limit * 1)
+                    .skip((page - 1) * limit);
+
+                const total = await Film.countDocuments(query);
+
+                res.json({
+                    success: true,
+                    films,
+                    totalPages: Math.ceil(total / limit),
+                    currentPage: page,
+                    total
+                });
+            } catch (error) {
+                console.error('Get films error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching films'
+                });
+            }
+        });
+
+        app.post('/api/films', async (req, res) => {
+            try {
+                const { title, director, year, duration, genre, description, posterUrl, trailerUrl } = req.body;
+
+                const token = req.headers.authorization?.split(' ')[1];
+                let userId = null;
+
+                if (token) {
+                    try {
+                        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_key_change_this');
+                        userId = decoded.id;
+                    } catch (e) {
+                        // Invalid token, continue without user
+                    }
+                }
+
+                const film = new Film({
+                    title,
+                    director,
+                    year,
+                    duration,
+                    genre,
+                    description,
+                    posterUrl,
+                    trailerUrl,
+                    submittedBy: userId,
+                    submissionStatus: 'pending'
+                });
+
+                await film.save();
+
+                res.status(201).json({
+                    success: true,
+                    message: 'Film submitted successfully',
+                    film
+                });
+            } catch (error) {
+                console.error('Create film error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error creating film submission'
+                });
+            }
+        });
+
+        app.get('/api/films/:id', async (req, res) => {
+            try {
+                const film = await Film.findById(req.params.id).populate('submittedBy', 'name email');
+
+                if (!film) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Film not found'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    film
+                });
+            } catch (error) {
+                console.error('Get film error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error fetching film'
+                });
+            }
+        });
+
+        app.put('/api/films/:id', async (req, res) => {
+            try {
+                const updates = req.body;
+                updates.updatedAt = Date.now();
+
+                const film = await Film.findByIdAndUpdate(
+                    req.params.id,
+                    updates,
+                    { new: true, runValidators: true }
+                );
+
+                if (!film) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Film not found'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    message: 'Film updated successfully',
+                    film
+                });
+            } catch (error) {
+                console.error('Update film error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error updating film'
+                });
+            }
+        });
+
+        app.delete('/api/films/:id', async (req, res) => {
+            try {
+                const film = await Film.findByIdAndDelete(req.params.id);
+
+                if (!film) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Film not found'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    message: 'Film deleted successfully'
+                });
+            } catch (error) {
+                console.error('Delete film error:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error deleting film'
+                });
+            }
+        });
         // ==================== ERROR HANDLERS ====================
 
         app.use((req, res) => {
