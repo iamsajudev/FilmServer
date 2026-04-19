@@ -1,6 +1,6 @@
 // ✅ VERY FIRST: Fix DNS issue for MongoDB Atlas (SRV)
 const dns = require("dns");
-const { Resend: ResendClient } = require("resend");  // ✅ ADD THIS LINE
+const { Resend: ResendClient } = require("resend"); // ✅ ADD THIS LINE
 dns.setServers(["8.8.8.8", "1.1.1.1"]); // Use Google DNS
 dns.setDefaultResultOrder("ipv4first");
 
@@ -356,64 +356,154 @@ async function sendConfirmationEmails(
   projectTitle,
   projectId,
 ) {
+  console.log("📧 SENDING EMAILS - Function called!");
+  console.log("To:", userEmail, "Project:", projectTitle);
+
   try {
     if (!process.env.RESEND_API_KEY) {
       console.log("⚠️ RESEND_API_KEY not set. Skipping email.");
-      return;
+      return false;
     }
 
+    console.log("✅ RESEND_API_KEY found, sending emails...");
     const resend = new ResendClient(process.env.RESEND_API_KEY);
 
-    // 1. Send email to USER
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM,
+    // 1. Send DETAILED email to USER
+    const userEmailResult = await resend.emails.send({
+      from: "noreply@nybff.us",
       to: [userEmail],
       subject: "🎉 Project Submission Confirmed - NYBFF",
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 30px; text-align: center; color: white;">
-            <h1>Submission Confirmed! 🎉</h1>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Project Submission Confirmed</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+            .success-icon { width: 60px; height: 60px; background: #10b981; border-radius: 50%; display: inline-block; line-height: 60px; font-size: 30px; margin-bottom: 20px; }
+            .info-box { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .info-box h3 { margin-top: 0; color: #374151; }
+            .button { background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; border-top: 1px solid #e0e0e0; padding-top: 20px; }
+            .status-badge { display: inline-block; background: #f59e0b; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="success-icon">✓</div>
+              <h1 style="margin: 0;">Submission Confirmed!</h1>
+            </div>
+            <div class="content">
+              <p>Dear <strong>${userName}</strong>,</p>
+              
+              <p>Thank you for submitting your project to the <strong>New York Borough Film Festival (NYBFF)</strong>. We have successfully received your submission and payment.</p>
+              
+              <div class="info-box">
+                <h3>📋 Submission Details</h3>
+                <p><strong>Project Title:</strong> ${projectTitle}<br>
+                <strong>Project ID:</strong> ${projectId}<br>
+                <strong>Submission Date:</strong> ${new Date().toLocaleString()}<br>
+                <strong>Status:</strong> <span class="status-badge">Pending Review</span></p>
+              </div>
+              
+              <h3>📅 What Happens Next?</h3>
+              <ul>
+                <li>🔍 <strong>Initial Review:</strong> Our team will review your submission within 5-7 business days</li>
+                <li>📧 <strong>Status Updates:</strong> You'll receive email notifications when your project status changes</li>
+                <li>👀 <strong>Track Progress:</strong> Log into your dashboard anytime to check your submission status</li>
+                <li>🏆 <strong>Selection Notification:</strong> If selected, you'll be notified via email with further instructions</li>
+              </ul>
+              
+              <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #0369a1;">
+                  <strong>💡 Tip:</strong> Save your Project ID (${projectId}) for future reference when contacting our support team.
+                </p>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://portals.nybff.us/dashboard" class="button">View My Dashboard →</a>
+              </div>
+              
+              <div class="footer">
+                <p><strong>New York Borough Film Festival</strong><br>
+                Email: support@nybff.us | Website: https://nybff.us</p>
+                <p>© ${new Date().getFullYear()} NYBFF. All rights reserved.</p>
+                <p style="font-size: 11px;">This is an automated message, please do not reply directly to this email.</p>
+              </div>
+            </div>
           </div>
-          <div style="padding: 30px; border: 1px solid #e0e0e0;">
-            <p>Dear <strong>${userName}</strong>,</p>
-            <p>Thank you for submitting <strong>"${projectTitle}"</strong> to NYBFF.</p>
-            <p><strong>Project ID:</strong> ${projectId}</p>
-            <p>Our team will review your submission within 5-7 business days.</p>
-            <p>You can track your submission status in your dashboard.</p>
-            <hr style="margin: 20px 0;">
-            <p style="color: #666; font-size: 12px;">Need help? Contact us at support@nybff.us</p>
-          </div>
-        </div>
+        </body>
+        </html>
       `,
     });
 
     console.log(`✅ Confirmation email sent to user: ${userEmail}`);
 
-    // 2. Send email to ADMIN
+    // 2. Send DETAILED email to ADMIN
     if (process.env.ADMIN_EMAIL) {
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM,
+      const adminEmailResult = await resend.emails.send({
+        from: "onboarding@resend.dev",
         to: [process.env.ADMIN_EMAIL],
         subject: "📬 New Project Submission - Action Required",
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #667eea; padding: 30px; text-align: center; color: white;">
-              <h1>New Submission Received! 📬</h1>
-            </div>
-            <div style="padding: 30px; border: 1px solid #e0e0e0;">
-              <p><strong>Project:</strong> ${projectTitle}</p>
-              <p><strong>Submitted by:</strong> ${userName}</p>
-              <p><strong>Email:</strong> ${userEmail}</p>
-              <p><strong>Project ID:</strong> ${projectId}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-              <div style="margin-top: 20px;">
-                <a href="https://portals.nybff.us/admin/submissions/${projectId}" 
-                   style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                  Review Submission →
-                </a>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>New Submission - Action Required</title>
+            <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: #667eea; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+              .info-box { background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b; }
+              .button { background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; }
+              .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 style="margin: 0;">📬 New Submission Received!</h1>
+              </div>
+              <div class="content">
+                <p>A new project has been submitted to the festival and requires your review.</p>
+                
+                <div class="info-box">
+                  <h3 style="margin-top: 0;">📋 Submission Information</h3>
+                  <p><strong>Project Title:</strong> ${projectTitle}<br>
+                  <strong>Submitted By:</strong> ${userName}<br>
+                  <strong>Email:</strong> ${userEmail}<br>
+                  <strong>Project ID:</strong> ${projectId}<br>
+                  <strong>Submission Date:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                
+                <h3>✅ Action Items:</h3>
+                <ul>
+                  <li>Review project details in admin dashboard</li>
+                  <li>Verify submission requirements are met</li>
+                  <li>Update project status (pending → in-review → approved/rejected)</li>
+                  <li>Communicate with submitter if additional info is needed</li>
+                </ul>
+                
+                <div style="text-align: center;">
+                  <a href="https://portals.nybff.us/admin/submissions/${projectId}" class="button">Review Submission →</a>
+                </div>
+                
+                <div class="footer">
+                  <p>NYBFF Admin System | ${new Date().toLocaleString()}</p>
+                </div>
               </div>
             </div>
-          </div>
+          </body>
+          </html>
         `,
       });
 
@@ -424,7 +514,8 @@ async function sendConfirmationEmails(
 
     return true;
   } catch (error) {
-    console.error("❌ Email error:", error.message);
+    console.error("❌ Email error details:", error.message);
+    console.error("Full error:", error);
     return false;
   }
 }
