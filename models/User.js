@@ -445,7 +445,7 @@ userSchema.pre('save', function(next) {
         this.username = this.email.split('@')[0];
     }
     
-    // Ensure stats object has all required fields
+    // Ensure stats object has all required fields with default values
     const defaultStats = {
         projects: 0,
         submissions: 0,
