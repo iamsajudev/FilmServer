@@ -1,5 +1,6 @@
 // ✅ VERY FIRST: Fix DNS issue for MongoDB Atlas (SRV)
 const dns = require("dns");
+const { Resend: ResendClient } = require("resend");  // ✅ ADD THIS LINE
 dns.setServers(["8.8.8.8", "1.1.1.1"]); // Use Google DNS
 dns.setDefaultResultOrder("ipv4first");
 
@@ -344,6 +345,88 @@ function getTimeAgo(date) {
   if (hours < 24) return `${hours} hours ago`;
   const days = Math.floor(hours / 24);
   return `${days} days ago`;
+}
+// ✅ ADD THE EMAIL FUNCTION RIGHT HERE (after getTimeAgo)
+// ==================== EMAIL SERVICE ====================
+// const { Resend } = require("resend");
+
+async function sendConfirmationEmails(
+  userEmail,
+  userName,
+  projectTitle,
+  projectId,
+) {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log("⚠️ RESEND_API_KEY not set. Skipping email.");
+      return;
+    }
+
+    const resend = new ResendClient(process.env.RESEND_API_KEY);
+
+    // 1. Send email to USER
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: [userEmail],
+      subject: "🎉 Project Submission Confirmed - NYBFF",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 30px; text-align: center; color: white;">
+            <h1>Submission Confirmed! 🎉</h1>
+          </div>
+          <div style="padding: 30px; border: 1px solid #e0e0e0;">
+            <p>Dear <strong>${userName}</strong>,</p>
+            <p>Thank you for submitting <strong>"${projectTitle}"</strong> to NYBFF.</p>
+            <p><strong>Project ID:</strong> ${projectId}</p>
+            <p>Our team will review your submission within 5-7 business days.</p>
+            <p>You can track your submission status in your dashboard.</p>
+            <hr style="margin: 20px 0;">
+            <p style="color: #666; font-size: 12px;">Need help? Contact us at support@nybff.us</p>
+          </div>
+        </div>
+      `,
+    });
+
+    console.log(`✅ Confirmation email sent to user: ${userEmail}`);
+
+    // 2. Send email to ADMIN
+    if (process.env.ADMIN_EMAIL) {
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM,
+        to: [process.env.ADMIN_EMAIL],
+        subject: "📬 New Project Submission - Action Required",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #667eea; padding: 30px; text-align: center; color: white;">
+              <h1>New Submission Received! 📬</h1>
+            </div>
+            <div style="padding: 30px; border: 1px solid #e0e0e0;">
+              <p><strong>Project:</strong> ${projectTitle}</p>
+              <p><strong>Submitted by:</strong> ${userName}</p>
+              <p><strong>Email:</strong> ${userEmail}</p>
+              <p><strong>Project ID:</strong> ${projectId}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+              <div style="margin-top: 20px;">
+                <a href="https://portals.nybff.us/admin/submissions/${projectId}" 
+                   style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                  Review Submission →
+                </a>
+              </div>
+            </div>
+          </div>
+        `,
+      });
+
+      console.log(
+        `✅ Notification email sent to admin: ${process.env.ADMIN_EMAIL}`,
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error("❌ Email error:", error.message);
+    return false;
+  }
 }
 
 // ✅ Start server AFTER DB connection
@@ -1345,6 +1428,12 @@ const startServer = async () => {
         });
 
         await project.save();
+        await sendConfirmationEmails(
+          req.body.email || req.user.email,
+          req.user.name,
+          req.body.projectTitle || req.body.title || "Project",
+          project._id,
+        );
 
         res.status(201).json({
           success: true,
@@ -1912,6 +2001,12 @@ const startServer = async () => {
         });
 
         await project.save();
+        await sendConfirmationEmails(
+          submissionData.email || req.user.email,
+          req.user.name || submissionData.firstName || "User",
+          submissionData.projectTitle,
+          project._id,
+        );
 
         res.status(201).json({
           success: true,
