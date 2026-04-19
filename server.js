@@ -543,6 +543,7 @@ const startServer = async () => {
       "http://localhost:5000",
       "https://server.nybff.us",
       "https://portals.nybff.us",
+      "https://portal.nybff.us",
       process.env.CORS_ORIGIN,
       process.env.CLIENT_URL,
     ].filter(Boolean);
