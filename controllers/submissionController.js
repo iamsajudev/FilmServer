@@ -20,34 +20,32 @@ const submitProject = async (req, res) => {
         
         // Create project record
         const project = new Project({
-            title: submissionData.projectTitle,
-            type: submissionData.projectType,
-            description: submissionData.briefSynopsis,
-            submitterInfo: {
-                email: submissionData.email,
-                phone: submissionData.phone,
-                address: submissionData.address,
-                city: submissionData.city,
-                country: submissionData.country
-            },
-            credits: {
-                directors: submissionData.directors,
-                writers: submissionData.writers,
-                producers: submissionData.producers,
-                keyCast: submissionData.keyCast
-            },
-            specifications: {
-                genres: submissionData.genres,
-                runtime: `${submissionData.runtimeHours}:${submissionData.runtimeMinutes}:${submissionData.runtimeSeconds}`,
-                completionDate: submissionData.completionDate,
-                language: submissionData.language,
-                shootingFormat: submissionData.shootingFormat,
-                aspectRatio: submissionData.aspectRatio
-            },
-            screenings: submissionData.screenings,
-            distributors: submissionData.distributors,
+            projectTitle: submissionData.projectTitle,
+            projectType: submissionData.projectType,
+            briefSynopsis: submissionData.briefSynopsis,
+            email: submissionData.email,
+            phone: submissionData.phone,
+            address: submissionData.address,
+            city: submissionData.city,
+            country: submissionData.country,
+            directors: submissionData.directors || [],
+            writers: submissionData.writers || [],
+            producers: submissionData.producers || [],
+            keyCast: submissionData.keyCast || [],
+            projectTypes: submissionData.projectTypes || [],
+            genres: submissionData.genres,
+            runtimeHours: submissionData.runtimeHours,
+            runtimeMinutes: submissionData.runtimeMinutes,
+            runtimeSeconds: submissionData.runtimeSeconds,
+            completionDate: submissionData.completionDate,
+            language: submissionData.language,
+            shootingFormat: submissionData.shootingFormat,
+            aspectRatio: submissionData.aspectRatio,
+            screenings: submissionData.screenings || [],
+            distributors: submissionData.distributors || [],
             paymentIntentId: submissionData.paymentIntentId,
-            userId: req.user.id,
+            userId: req.user._id,  // ✅ Make sure this is set
+            submissionStatus: 'pending',
             status: 'pending',
             submittedAt: new Date()
         });

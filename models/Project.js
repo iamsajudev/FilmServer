@@ -114,29 +114,41 @@ const projectSchema = new mongoose.Schema({
     paymentIntentId: { type: String, default: '' },
     
     // ==================== SYSTEM FIELDS ====================
+    // ✅ FIX: Properly define userId as ObjectId reference
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: true,
+        index: true
     },
     submissionStatus: {
         type: String,
-        default: 'submitted'
+        enum: ['pending', 'in-review', 'approved', 'rejected', 'submitted'],
+        default: 'pending'
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'in-review', 'approved', 'rejected', 'submitted'],
+        default: 'pending'
     },
     adminNotes: { type: String, default: '' },
-    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewedBy: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        default: null 
+    },
     reviewedAt: { type: Date, default: null },
     submittedAt: { type: Date, default: Date.now }
 }, {
     timestamps: true,
-    strict: false
+    strictPopulate: false  // ✅ Add this to avoid strict populate errors
 });
 
 // ==================== INDEXES ====================
 projectSchema.index({ projectTitle: 'text', briefSynopsis: 'text' });
 projectSchema.index({ userId: 1 });
 projectSchema.index({ createdAt: -1 });
-
-// ==================== NO MIDDLEWARE - REMOVED PRE-SAVE ====================
+projectSchema.index({ submissionStatus: 1 });
+projectSchema.index({ email: 1 });
 
 module.exports = mongoose.model('Project', projectSchema);
