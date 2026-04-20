@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Project Status Update - NYBFF</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #667eea; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; border: 1px solid #ddd; }
+    .status-approved { color: #10b981; font-weight: bold; }
+    .status-rejected { color: #ef4444; font-weight: bold; }
+    .status-review { color: #f59e0b; font-weight: bold; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Project Status Update</h2>
+    </div>
+    <div class="content">
+      <p>Dear {{userName}},</p>
+      
+      <p>Your project <strong>"{{projectTitle}}"</strong> status has been updated to:</p>
+      
+      <h3 class="status-{{status}}">{{statusText}}</h3>
+      
+      {{#if adminNotes}}
+      <div style="background: #f3f4f6; padding: 15px; margin: 15px 0;">
+        <strong>Admin Notes:</strong><br>
+        {{adminNotes}}
+      </div>
+      {{/if}}
+      
+      <p>Log into your dashboard for more details.</p>
+      
+      <div style="text-align: center; margin: 20px;">
+        <a href="https://portals.nybff.us/dashboard" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none;">View Dashboard</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>NYBFF | support@nybff.us</p>
+    </div>
+  </div>
+</body>
+</html>

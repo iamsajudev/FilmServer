@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Submission - Action Required</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #667eea; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+    .info-box { background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b; }
+    .button { background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; }
+    .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0;">📬 New Submission Received!</h1>
+    </div>
+    <div class="content">
+      <p>A new project has been submitted to the festival and requires your review.</p>
+      
+      <div class="info-box">
+        <h3 style="margin-top: 0;">📋 Submission Information</h3>
+        <p><strong>Project Title:</strong> {{projectTitle}}<br>
+        <strong>Submitted By:</strong> {{userName}}<br>
+        <strong>Email:</strong> {{userEmail}}<br>
+        <strong>Project ID:</strong> {{projectId}}<br>
+        <strong>Submission Date:</strong> {{submissionDate}}</p>
+      </div>
+      
+      <h3>✅ Action Items:</h3>
+      <ul>
+        <li>Review project details in admin dashboard</li>
+        <li>Verify submission requirements are met</li>
+        <li>Update project status (pending → in-review → approved/rejected)</li>
+        <li>Communicate with submitter if additional info is needed</li>
+      </ul>
+      
+      <div style="text-align: center;">
+        <a href="https://portals.nybff.us/admin/submissions/{{projectId}}" class="button">Review Submission →</a>
+      </div>
+      
+      <div class="footer">
+        <p>NYBFF Admin System | {{submissionDate}}</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

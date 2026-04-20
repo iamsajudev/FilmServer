@@ -1,6 +1,5 @@
 // ✅ VERY FIRST: Fix DNS issue for MongoDB Atlas (SRV)
 const dns = require("dns");
-const { Resend: ResendClient } = require("resend"); // ✅ ADD THIS LINE
 dns.setServers(["8.8.8.8", "1.1.1.1"]); // Use Google DNS
 dns.setDefaultResultOrder("ipv4first");
 
@@ -12,14 +11,22 @@ console.log("=== Environment Check ===");
 console.log("PORT:", process.env.PORT);
 console.log(
   "MONGODB_URI:",
-  process.env.MONGODB_URI ? "✅ Defined" : "❌ Undefined",
+  process.env.MONGODB_URI ? "✅ Defined" : "❌ Undefined"
 );
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("CORS_ORIGIN:", process.env.CORS_ORIGIN);
 console.log("CLIENT_URL:", process.env.CLIENT_URL);
 console.log(
   "JWT_SECRET:",
-  process.env.JWT_SECRET ? "✅ Defined" : "❌ Undefined",
+  process.env.JWT_SECRET ? "✅ Defined" : "❌ Undefined"
+);
+console.log(
+  "GMAIL_EMAIL:",
+  process.env.GMAIL_EMAIL ? "✅ Defined" : "❌ Undefined"
+);
+console.log(
+  "GMAIL_APP_PASSWORD:",
+  process.env.GMAIL_APP_PASSWORD ? "✅ Defined" : "❌ Undefined"
 );
 console.log("========================\n");
 
@@ -31,8 +38,14 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ✅ Import the User model from models folder
+// ✅ Import models from models folder (NO NEED TO REDEFINE SCHEMAS!)
 const User = require("./models/User");
+const Project = require("./models/Project");
+const Film = require("./models/Film");
+const Submission = require("./models/Submission");
+
+// ✅ Import Email Service
+const emailService = require("./services/emailService");
 
 // ✅ MongoDB Connection Function
 const connectDB = async () => {
@@ -88,7 +101,7 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || "default_secret_key_change_this",
+      process.env.JWT_SECRET || "default_secret_key_change_this"
     );
     const user = await User.findById(decoded.id).select("-password");
 
@@ -122,183 +135,6 @@ const adminMiddleware = (req, res, next) => {
   }
 };
 
-// ✅ Define Project Schema (Complete)
-const projectSchema = new mongoose.Schema(
-  {
-    // Basic Information
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    category: { type: String, required: true },
-    director: { type: String, required: true },
-    year: { type: Number },
-    duration: { type: Number },
-    genre: { type: String },
-    posterUrl: { type: String },
-    trailerUrl: { type: String },
-    status: {
-      type: String,
-      enum: ["pending", "approved", "rejected", "in-review"],
-      default: "pending",
-    },
-    submittedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
-
-    // Step 1: Project Information - Additional fields
-    hasNonEnglishTitle: { type: Boolean, default: false },
-    nonEnglishTitle: { type: String, default: "" },
-    nonEnglishSynopsis: { type: String, default: "" },
-    website: { type: String, default: "" },
-    twitter: { type: String, default: "" },
-    facebook: { type: String, default: "" },
-    instagram: { type: String, default: "" },
-
-    // Step 2: Submitter Information
-    submitterEmail: { type: String, default: "" },
-    submitterPhone: { type: String, default: "" },
-    submitterAddress: { type: String, default: "" },
-    submitterCity: { type: String, default: "" },
-    submitterStateProvince: { type: String, default: "" },
-    submitterPostalCode: { type: String, default: "" },
-    submitterCountry: { type: String, default: "" },
-    submitterBirthDate: { type: String, default: "" },
-    submitterGender: { type: String, default: "" },
-    submitterPronouns: { type: String, default: "" },
-
-    // Step 3: Credits
-    directors: [
-      {
-        firstName: String,
-        middleName: String,
-        lastName: String,
-        priorCredits: String,
-      },
-    ],
-    writers: [
-      {
-        firstName: String,
-        middleName: String,
-        lastName: String,
-        priorCredits: String,
-      },
-    ],
-    producers: [
-      {
-        firstName: String,
-        middleName: String,
-        lastName: String,
-        priorCredits: String,
-      },
-    ],
-    keyCast: [
-      {
-        firstName: String,
-        middleName: String,
-        lastName: String,
-        role: String,
-        priorCredits: String,
-      },
-    ],
-
-    // Step 4: Specifications
-    projectTypes: [String],
-    genres: { type: String, default: "" },
-    runtimeHours: { type: String, default: "00" },
-    runtimeMinutes: { type: String, default: "00" },
-    runtimeSeconds: { type: String, default: "00" },
-    completionDate: { type: String, default: "" },
-    productionBudget: { type: String, default: "" },
-    countryOfOrigin: { type: String, default: "" },
-    countryOfFilming: { type: String, default: "" },
-    language: { type: String, default: "en" },
-    shootingFormat: { type: String, default: "" },
-    aspectRatio: { type: String, default: "16:9" },
-    filmColor: { type: String, default: "Color" },
-    studentProject: { type: String, default: "No" },
-    firstTimeFilmmaker: { type: String, default: "No" },
-
-    // Step 5: Screenings
-    screenings: [
-      {
-        festivalName: String,
-        screeningDate: Date,
-        location: String,
-        awardWon: String,
-      },
-    ],
-    distributors: [
-      {
-        name: String,
-        contact: String,
-        region: String,
-      },
-    ],
-
-    // Payment
-    paymentIntentId: { type: String, default: "" },
-    submittedAt: { type: Date, default: Date.now },
-
-    // Admin fields
-    adminNotes: { type: String, default: "" },
-    reviewedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    reviewedAt: { type: Date, default: null },
-  },
-  {
-    timestamps: true,
-    strictPopulate: false,
-  },
-);
-
-// ✅ Define Film Schema
-const filmSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  director: { type: String, required: true },
-  year: { type: Number },
-  duration: { type: Number },
-  genre: { type: String },
-  description: { type: String },
-  posterUrl: { type: String },
-  trailerUrl: { type: String },
-  submissionStatus: {
-    type: String,
-    enum: ["pending", "approved", "rejected"],
-    default: "pending",
-  },
-  submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
-
-// ✅ Define Submission Schema
-const submissionSchema = new mongoose.Schema({
-  filmId: { type: mongoose.Schema.Types.ObjectId, ref: "Film", required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  status: {
-    type: String,
-    enum: ["pending", "reviewing", "accepted", "rejected"],
-    default: "pending",
-  },
-  feedback: { type: String },
-  submittedAt: { type: Date, default: Date.now },
-  reviewedAt: { type: Date },
-  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-});
-
-// ✅ Register models
-const Project =
-  mongoose.models.Project || mongoose.model("Project", projectSchema);
-const Film = mongoose.models.Film || mongoose.model("Film", filmSchema);
-const Submission =
-  mongoose.models.Submission || mongoose.model("Submission", submissionSchema);
-
 // ✅ Create Admin User Function
 const createAdminUser = async () => {
   try {
@@ -308,7 +144,7 @@ const createAdminUser = async () => {
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash(
         process.env.ADMIN_PASSWORD || "Admin@123456",
-        10,
+        10
       );
 
       const adminUser = new User({
@@ -325,7 +161,7 @@ const createAdminUser = async () => {
       console.log("✅ Admin user created successfully");
       console.log(`📧 Email: ${adminEmail}`);
       console.log(
-        `🔑 Password: ${process.env.ADMIN_PASSWORD || "Admin@123456"}`,
+        `🔑 Password: ${process.env.ADMIN_PASSWORD || "Admin@123456"}`
       );
     } else {
       console.log("✅ Admin user already exists");
@@ -346,176 +182,40 @@ function getTimeAgo(date) {
   const days = Math.floor(hours / 24);
   return `${days} days ago`;
 }
-// ✅ ADD THE EMAIL FUNCTION RIGHT HERE (after getTimeAgo)
-// ==================== EMAIL SERVICE ====================
-// const { Resend } = require("resend");
 
+// ==================== EMAIL FUNCTIONS ====================
 async function sendConfirmationEmails(
   userEmail,
   userName,
   projectTitle,
-  projectId,
+  projectId
 ) {
   console.log("📧 SENDING EMAILS - Function called!");
   console.log("To:", userEmail, "Project:", projectTitle);
 
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.log("⚠️ RESEND_API_KEY not set. Skipping email.");
-      return false;
-    }
+    // Send to user using template
+    const userResult = await emailService.sendSubmissionConfirmation(
+      userEmail,
+      userName,
+      projectTitle,
+      projectId
+    );
 
-    console.log("✅ RESEND_API_KEY found, sending emails...");
-    const resend = new ResendClient(process.env.RESEND_API_KEY);
-
-    // 1. Send DETAILED email to USER
-    const userEmailResult = await resend.emails.send({
-      from: "noreply@nybff.us",
-      to: [userEmail],
-      subject: "🎉 Project Submission Confirmed - NYBFF",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Project Submission Confirmed</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-            .success-icon { width: 60px; height: 60px; background: #10b981; border-radius: 50%; display: inline-block; line-height: 60px; font-size: 30px; margin-bottom: 20px; }
-            .info-box { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .info-box h3 { margin-top: 0; color: #374151; }
-            .button { background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; border-top: 1px solid #e0e0e0; padding-top: 20px; }
-            .status-badge { display: inline-block; background: #f59e0b; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="success-icon">✓</div>
-              <h1 style="margin: 0;">Submission Confirmed!</h1>
-            </div>
-            <div class="content">
-              <p>Dear <strong>${userName}</strong>,</p>
-              
-              <p>Thank you for submitting your project to the <strong>New York Borough Film Festival (NYBFF)</strong>. We have successfully received your submission and payment.</p>
-              
-              <div class="info-box">
-                <h3>📋 Submission Details</h3>
-                <p><strong>Project Title:</strong> ${projectTitle}<br>
-                <strong>Project ID:</strong> ${projectId}<br>
-                <strong>Submission Date:</strong> ${new Date().toLocaleString()}<br>
-                <strong>Status:</strong> <span class="status-badge">Pending Review</span></p>
-              </div>
-              
-              <h3>📅 What Happens Next?</h3>
-              <ul>
-                <li>🔍 <strong>Initial Review:</strong> Our team will review your submission within 5-7 business days</li>
-                <li>📧 <strong>Status Updates:</strong> You'll receive email notifications when your project status changes</li>
-                <li>👀 <strong>Track Progress:</strong> Log into your dashboard anytime to check your submission status</li>
-                <li>🏆 <strong>Selection Notification:</strong> If selected, you'll be notified via email with further instructions</li>
-              </ul>
-              
-              <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin: 0; color: #0369a1;">
-                  <strong>💡 Tip:</strong> Save your Project ID (${projectId}) for future reference when contacting our support team.
-                </p>
-              </div>
-              
-              <div style="text-align: center;">
-                <a href="https://portals.nybff.us/dashboard" class="button">View My Dashboard →</a>
-              </div>
-              
-              <div class="footer">
-                <p><strong>New York Borough Film Festival</strong><br>
-                Email: support@nybff.us | Website: https://nybff.us</p>
-                <p>© ${new Date().getFullYear()} NYBFF. All rights reserved.</p>
-                <p style="font-size: 11px;">This is an automated message, please do not reply directly to this email.</p>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    });
-
-    console.log(`✅ Confirmation email sent to user: ${userEmail}`);
-
-    // 2. Send DETAILED email to ADMIN
+    // Send to admin if email is configured
     if (process.env.ADMIN_EMAIL) {
-      const adminEmailResult = await resend.emails.send({
-        from: "onboarding@resend.dev",
-        to: [process.env.ADMIN_EMAIL],
-        subject: "📬 New Project Submission - Action Required",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>New Submission - Action Required</title>
-            <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #667eea; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-              .info-box { background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b; }
-              .button { background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; }
-              .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1 style="margin: 0;">📬 New Submission Received!</h1>
-              </div>
-              <div class="content">
-                <p>A new project has been submitted to the festival and requires your review.</p>
-                
-                <div class="info-box">
-                  <h3 style="margin-top: 0;">📋 Submission Information</h3>
-                  <p><strong>Project Title:</strong> ${projectTitle}<br>
-                  <strong>Submitted By:</strong> ${userName}<br>
-                  <strong>Email:</strong> ${userEmail}<br>
-                  <strong>Project ID:</strong> ${projectId}<br>
-                  <strong>Submission Date:</strong> ${new Date().toLocaleString()}</p>
-                </div>
-                
-                <h3>✅ Action Items:</h3>
-                <ul>
-                  <li>Review project details in admin dashboard</li>
-                  <li>Verify submission requirements are met</li>
-                  <li>Update project status (pending → in-review → approved/rejected)</li>
-                  <li>Communicate with submitter if additional info is needed</li>
-                </ul>
-                
-                <div style="text-align: center;">
-                  <a href="https://portals.nybff.us/admin/submissions/${projectId}" class="button">Review Submission →</a>
-                </div>
-                
-                <div class="footer">
-                  <p>NYBFF Admin System | ${new Date().toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
-      });
-
-      console.log(
-        `✅ Notification email sent to admin: ${process.env.ADMIN_EMAIL}`,
+      const adminResult = await emailService.sendAdminNotification(
+        process.env.ADMIN_EMAIL,
+        userName,
+        userEmail,
+        projectTitle,
+        projectId
       );
     }
 
     return true;
   } catch (error) {
     console.error("❌ Email error details:", error.message);
-    console.error("Full error:", error);
     return false;
   }
 }
@@ -541,6 +241,7 @@ const startServer = async () => {
     const allowedOrigins = [
       "http://localhost:3000",
       "http://localhost:5000",
+      "http://localhost:3001",
       "https://server.nybff.us",
       "https://portals.nybff.us",
       "https://portal.nybff.us",
@@ -569,7 +270,7 @@ const startServer = async () => {
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-      }),
+      })
     );
 
     // ✅ Logger
@@ -584,6 +285,45 @@ const startServer = async () => {
 
     // ✅ Create admin user after DB connection
     await createAdminUser();
+
+    // ==================== TEST EMAIL ROUTE (FOR POSTMAN) ====================
+    app.post("/api/test-email", async (req, res) => {
+      try {
+        const { email, name } = req.body;
+
+        if (!email) {
+          return res.status(400).json({
+            success: false,
+            message: "Email is required",
+          });
+        }
+
+        const testResult = await emailService.sendSubmissionConfirmation(
+          email,
+          name || "Test User",
+          "Test Project",
+          "TEST123456"
+        );
+
+        if (testResult) {
+          res.json({
+            success: true,
+            message: "Test email sent successfully! Check your inbox.",
+          });
+        } else {
+          res.status(500).json({
+            success: false,
+            message: "Failed to send test email. Check Gmail credentials.",
+          });
+        }
+      } catch (error) {
+        console.error("Test email error:", error);
+        res.status(500).json({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
 
     // ==================== AUTH ROUTES ====================
 
@@ -631,7 +371,7 @@ const startServer = async () => {
         const token = jwt.sign(
           { id: user._id, email: user.email, role: user.role },
           process.env.JWT_SECRET || "default_secret_key_change_this",
-          { expiresIn: "7d" },
+          { expiresIn: "7d" }
         );
 
         res.status(201).json({
@@ -666,7 +406,7 @@ const startServer = async () => {
         }
 
         const user = await User.findOne({ email: email.toLowerCase() }).select(
-          "+password",
+          "+password"
         );
         if (!user) {
           return res.status(401).json({
@@ -693,7 +433,7 @@ const startServer = async () => {
         const token = jwt.sign(
           { id: user._id, email: user.email, role: user.role },
           process.env.JWT_SECRET || "default_secret_key_change_this",
-          { expiresIn: "7d" },
+          { expiresIn: "7d" }
         );
 
         res.json({
@@ -969,7 +709,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.delete(
@@ -1006,7 +746,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.patch(
@@ -1030,7 +770,8 @@ const startServer = async () => {
 
           res.json({
             success: true,
-            message: `User ${isActive ? "activated" : "deactivated"} successfully`,
+            message: `User ${isActive ? "activated" : "deactivated"
+              } successfully`,
           });
         } catch (error) {
           console.error("Update status error:", error);
@@ -1039,7 +780,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.patch(
@@ -1072,7 +813,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     // ==================== ADMIN SUBMISSION MANAGEMENT ROUTES ====================
@@ -1137,7 +878,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.get(
@@ -1178,7 +919,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.patch(
@@ -1234,7 +975,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.delete(
@@ -1264,8 +1005,9 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
+
     // Get submission statistics (Admin only)
     app.get(
       "/api/admin/submissions/stats",
@@ -1275,16 +1017,16 @@ const startServer = async () => {
         try {
           const total = await Project.countDocuments();
           const pending = await Project.countDocuments({
-            submissionStatus: "pending",
+            status: "pending",
           });
           const inReview = await Project.countDocuments({
-            submissionStatus: "in-review",
+            status: "in-review",
           });
           const approved = await Project.countDocuments({
-            submissionStatus: "approved",
+            status: "approved",
           });
           const rejected = await Project.countDocuments({
-            submissionStatus: "rejected",
+            status: "rejected",
           });
 
           // Get submissions by month (last 6 months)
@@ -1295,12 +1037,12 @@ const startServer = async () => {
             const startOfMonth = new Date(
               date.getFullYear(),
               date.getMonth(),
-              1,
+              1
             );
             const endOfMonth = new Date(
               date.getFullYear(),
               date.getMonth() + 1,
-              0,
+              0
             );
 
             const count = await Project.countDocuments({
@@ -1332,7 +1074,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     // Bulk update submissions status (Admin only)
@@ -1369,12 +1111,11 @@ const startServer = async () => {
             { _id: { $in: submissionIds } },
             {
               $set: {
-                submissionStatus: status,
                 status: status,
                 reviewedBy: req.user._id,
                 reviewedAt: new Date(),
               },
-            },
+            }
           );
 
           res.json({
@@ -1389,7 +1130,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     // ==================== PROJECT ROUTES ====================
@@ -1397,9 +1138,9 @@ const startServer = async () => {
     // Get user's own projects
     app.get("/api/projects/user/list", authMiddleware, async (req, res) => {
       try {
-        const projects = await Project.find({ submittedBy: req.user._id }).sort(
-          { createdAt: -1 },
-        );
+        const projects = await Project.find({
+          submittedBy: req.user._id,
+        }).sort({ createdAt: -1 });
         res.json({ success: true, count: projects.length, projects });
       } catch (error) {
         console.error("Get user projects error:", error);
@@ -1451,8 +1192,8 @@ const startServer = async () => {
           category = req.body.projectType;
           if (req.body.directors && req.body.directors.length > 0) {
             const firstDirector = req.body.directors[0];
-            director =
-              `${firstDirector.firstName || ""} ${firstDirector.lastName || ""}`.trim();
+            director = `${firstDirector.firstName || ""
+              } ${firstDirector.lastName || ""}`.trim();
           }
           if (!director) director = req.body.director || "Not specified";
         } else {
@@ -1524,7 +1265,7 @@ const startServer = async () => {
           req.body.email || req.user.email,
           req.user.name,
           req.body.projectTitle || req.body.title || "Project",
-          project._id,
+          project._id
         );
 
         res.status(201).json({
@@ -1544,9 +1285,9 @@ const startServer = async () => {
     // Get user's own projects (alias for /my-projects)
     app.get("/api/projects/my-projects", authMiddleware, async (req, res) => {
       try {
-        const projects = await Project.find({ submittedBy: req.user._id }).sort(
-          { createdAt: -1 },
-        );
+        const projects = await Project.find({
+          submittedBy: req.user._id,
+        }).sort({ createdAt: -1 });
 
         res.json({
           success: true,
@@ -1561,12 +1302,13 @@ const startServer = async () => {
         });
       }
     });
+
     // Get single project
     app.get("/api/projects/:id", async (req, res) => {
       try {
         const project = await Project.findById(req.params.id).populate(
           "submittedBy",
-          "name email",
+          "name email"
         );
 
         if (!project) {
@@ -1588,6 +1330,7 @@ const startServer = async () => {
         });
       }
     });
+
     // Update project
     app.put("/api/projects/:id", authMiddleware, async (req, res) => {
       try {
@@ -1616,7 +1359,7 @@ const startServer = async () => {
         const updatedProject = await Project.findByIdAndUpdate(
           req.params.id,
           updates,
-          { new: true, runValidators: true },
+          { new: true, runValidators: true }
         );
 
         res.json({
@@ -1632,6 +1375,7 @@ const startServer = async () => {
         });
       }
     });
+
     // Delete project
     app.delete("/api/projects/:id", authMiddleware, async (req, res) => {
       try {
@@ -1679,7 +1423,8 @@ const startServer = async () => {
           const { amount = 2500, currency = "usd" } = req.body; // 2500 cents = $25.00
 
           console.log(
-            `Creating payment intent for user ${req.user._id}: $${amount / 100} ${currency}`,
+            `Creating payment intent for user ${req.user._id}: $${amount / 100
+            } ${currency}`
           );
 
           // Check if Stripe secret key is configured
@@ -1733,7 +1478,7 @@ const startServer = async () => {
             });
           }
         }
-      },
+      }
     );
 
     // ==================== FILM ROUTES ====================
@@ -1790,7 +1535,7 @@ const startServer = async () => {
           try {
             const decoded = jwt.verify(
               token,
-              process.env.JWT_SECRET || "default_secret_key_change_this",
+              process.env.JWT_SECRET || "default_secret_key_change_this"
             );
             userId = decoded.id;
           } catch (e) {
@@ -1831,7 +1576,7 @@ const startServer = async () => {
       try {
         const film = await Film.findById(req.params.id).populate(
           "submittedBy",
-          "name email",
+          "name email"
         );
 
         if (!film) {
@@ -1908,6 +1653,7 @@ const startServer = async () => {
         });
       }
     });
+
     // ==================== DASHBOARD STATS ROUTES ====================
 
     app.get(
@@ -1955,7 +1701,7 @@ const startServer = async () => {
             message: error.message,
           });
         }
-      },
+      }
     );
 
     app.get(
@@ -1995,7 +1741,7 @@ const startServer = async () => {
           console.error("Activities error:", error);
           res.json({ success: true, activities: [] });
         }
-      },
+      }
     );
 
     app.get(
@@ -2042,8 +1788,12 @@ const startServer = async () => {
           console.error("Tasks error:", error);
           res.json({ success: true, tasks: [] });
         }
-      },
+      }
     );
+
+    // ==================== PROJECT SUBMISSION ROUTE ====================
+
+    // ==================== PROJECT SUBMISSION ROUTE ====================
 
     // ==================== PROJECT SUBMISSION ROUTE ====================
 
@@ -2051,62 +1801,120 @@ const startServer = async () => {
       try {
         const submissionData = req.body;
 
-        const requiredFields = ["projectTitle", "projectType", "email"];
-        for (const field of requiredFields) {
-          if (!submissionData[field]) {
-            return res.status(400).json({
-              success: false,
-              message: `Missing required field: ${field}`,
-            });
-          }
+        console.log("📝 Received submission:", JSON.stringify(submissionData, null, 2));
+
+        // Validate required fields according to your schema
+        if (!submissionData.projectTitle) {
+          return res.status(400).json({
+            success: false,
+            message: "projectTitle is required"
+          });
         }
 
+        if (!submissionData.briefSynopsis) {
+          return res.status(400).json({
+            success: false,
+            message: "briefSynopsis is required"
+          });
+        }
+
+        if (!submissionData.projectType) {
+          return res.status(400).json({
+            success: false,
+            message: "projectType is required"
+          });
+        }
+
+        if (!submissionData.email) {
+          return res.status(400).json({
+            success: false,
+            message: "email is required"
+          });
+        }
+
+        // Create project with your schema fields
         const project = new Project({
-          title: submissionData.projectTitle,
-          category: submissionData.projectType,
-          description: submissionData.briefSynopsis,
-          director: submissionData.directors?.[0]?.firstName || "Not specified",
-          submitterEmail: submissionData.email,
-          submitterPhone: submissionData.phone,
-          submitterAddress: submissionData.address,
-          submitterCity: submissionData.city,
-          submitterCountry: submissionData.country,
+          // Step 1: Project Information
+          projectType: submissionData.projectType,
+          projectTitle: submissionData.projectTitle,
+          briefSynopsis: submissionData.briefSynopsis,
+          hasNonEnglishTitle: submissionData.hasNonEnglishTitle || false,
+          nonEnglishTitle: submissionData.nonEnglishTitle || "",
+          nonEnglishSynopsis: submissionData.nonEnglishSynopsis || "",
+          website: submissionData.website || "",
+          twitter: submissionData.twitter || "",
+          facebook: submissionData.facebook || "",
+          instagram: submissionData.instagram || "",
+
+          // Step 2: Submitter Information
+          email: submissionData.email,
+          phone: submissionData.phone || "",
+          address: submissionData.address || "",
+          city: submissionData.city || "",
+          stateProvince: submissionData.stateProvince || "",
+          postalCode: submissionData.postalCode || "",
+          country: submissionData.country || "",
+          birthDate: submissionData.birthDate || null,
+          gender: submissionData.gender || "",
+          pronouns: submissionData.pronouns || "",
+
+          // Step 3: Credits
           directors: submissionData.directors || [],
           writers: submissionData.writers || [],
           producers: submissionData.producers || [],
           keyCast: submissionData.keyCast || [],
-          projectTypes: submissionData.projectTypes || [],
-          genres: submissionData.genres,
-          runtimeHours: submissionData.runtimeHours,
-          runtimeMinutes: submissionData.runtimeMinutes,
-          runtimeSeconds: submissionData.runtimeSeconds,
-          completionDate: submissionData.completionDate,
-          language: submissionData.language,
-          shootingFormat: submissionData.shootingFormat,
-          aspectRatio: submissionData.aspectRatio,
+
+          // Step 4: Technical Specifications
+          projectTypes: submissionData.projectTypes || [submissionData.projectType],
+          genres: submissionData.genres || "",
+          runtimeHours: submissionData.runtimeHours || "00",
+          runtimeMinutes: submissionData.runtimeMinutes || "00",
+          runtimeSeconds: submissionData.runtimeSeconds || "00",
+          completionDate: submissionData.completionDate || null,
+          productionBudget: submissionData.productionBudget || "",
+          countryOfOrigin: submissionData.countryOfOrigin || "",
+          countryOfFilming: submissionData.countryOfFilming || "",
+          language: submissionData.language || "",
+          shootingFormat: submissionData.shootingFormat || "",
+          aspectRatio: submissionData.aspectRatio || "16:9",
+          filmColor: submissionData.filmColor || "Color",
+          studentProject: submissionData.studentProject || "No",
+          firstTimeFilmmaker: submissionData.firstTimeFilmmaker || "No",
+
+          // Step 5: Screenings & Distributors
           screenings: submissionData.screenings || [],
           distributors: submissionData.distributors || [],
-          paymentIntentId: submissionData.paymentIntentId,
-          submittedBy: req.user._id,
+
+          // Step 6: Payment
+          paymentIntentId: submissionData.paymentIntentId || "",
+
+          // System Fields
+          userId: req.user._id,  // ✅ This is the required userId field
+          submissionStatus: "pending",
           status: "pending",
-          submittedAt: new Date(),
+          submittedAt: new Date()
         });
 
         await project.save();
+
+        console.log("✅ Project saved with ID:", project._id);
+
+        // Send email confirmation
         await sendConfirmationEmails(
-          submissionData.email || req.user.email,
-          req.user.name || submissionData.firstName || "User",
+          submissionData.email,
+          req.user.name || "User",
           submissionData.projectTitle,
-          project._id,
+          project._id
         );
 
         res.status(201).json({
           success: true,
-          message: "Project submitted successfully",
+          message: "Project submitted successfully! Check your email for confirmation.",
           data: project,
         });
+
       } catch (error) {
-        console.error("Submit project error:", error);
+        console.error("❌ Submit project error:", error);
         res.status(500).json({
           success: false,
           message: error.message || "Server error",

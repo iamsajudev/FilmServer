@@ -16,13 +16,15 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
+    "fs": "^0.0.1-security",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.1",
     "mongoose": "^9.3.3",
     "morgan": "^1.10.1",
+    "nodemailer": "^8.0.5",
     "npm": "^11.12.1",
-    "resend": "^6.12.0",
+    "path": "^0.12.7",
     "stripe": "^21.0.1"
   },
   "devDependencies": {
