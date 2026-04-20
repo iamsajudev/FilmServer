@@ -242,7 +242,7 @@ const startServer = async () => {
       "http://localhost:3000",
       "http://localhost:5000",
       "http://localhost:3001",
-      "https://updated-film-fronted-i95o.vercel.app",
+      "https://portal-nybff.vercel.app",
       "https://server.nybff.us",
       "https://portals.nybff.us",
       "https://portal.nybff.us",
