@@ -15,17 +15,17 @@ const { protect, adminOnly } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// ============ PUBLIC ROUTES ============
+// ============ PUBLIC ROUTES (No authentication required) ============
 router.get('/', getAllProjects);
 router.get('/slug/:slug', getProjectBySlug);
+router.post('/submit', submitProject);  // ✅ PUBLIC - No auth required
 
-// ============ PROTECTED ROUTES ============
-router.use(protect);
+// ============ PROTECTED ROUTES (Authentication required) ============
+router.use(protect);  // All routes below require authentication
 
-// SPECIFIC routes - USE A UNIQUE PREFIX
-router.get('/user/list', getUserProjects);  // Changed to /user/list
-router.post('/create', createProject);       // Changed to /create
-router.post('/submit', submitProject);
+// User's own projects
+router.get('/user/list', getUserProjects);
+router.post('/create', createProject);
 
 // Dynamic routes (with parameters)
 router.get('/:id', getProjectById);
@@ -33,9 +33,10 @@ router.put('/:id', updateProject);
 router.delete('/:id', deleteProject);
 router.post('/:id/reviews', addReview);
 
-// ============ ADMIN ROUTES ============
+// Admin routes
 router.get('/admin/all', adminOnly, getAllProjects);
 
+// Test route
 router.get('/test', (req, res) => {
     res.json({ success: true, message: 'Project routes are working!' });
 });

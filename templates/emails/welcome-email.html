@@ -1,0 +1,466 @@
+<!-- templates/emails/welcome-email.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Welcome to NYBFF</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a202c;
+      background-color: #f7fafc;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    
+    .header p {
+      font-size: 16px;
+      opacity: 0.95;
+    }
+    
+    .content {
+      padding: 40px 30px;
+      background: #ffffff;
+    }
+    
+    .greeting {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #2d3748;
+    }
+    
+    .greeting strong {
+      color: #764ba2;
+    }
+    
+    .credentials-box {
+      background: linear-gradient(135deg, #fff5e6 0%, #ffe8f0 100%);
+      border: 2px solid #ffd4e5;
+      border-radius: 16px;
+      padding: 25px;
+      margin: 25px 0;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .credentials-box h3 {
+      color: #764ba2;
+      font-size: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .credential-item {
+      background: white;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 12px;
+      text-align: left;
+      border-left: 4px solid #764ba2;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .credential-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #764ba2;
+      margin-bottom: 8px;
+    }
+    
+    .credential-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2d3748;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .temp-password {
+      background: #fef3c7;
+      border-left-color: #f59e0b;
+    }
+    
+    .temp-password .credential-value {
+      color: #d97706;
+      font-size: 20px;
+      letter-spacing: 1px;
+    }
+    
+    .security-warning {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      padding: 15px;
+      margin: 20px 0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    
+    .security-warning .icon {
+      font-size: 24px;
+    }
+    
+    .security-warning .text {
+      flex: 1;
+    }
+    
+    .security-warning .text strong {
+      color: #dc2626;
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    .security-warning .text p {
+      color: #991b1b;
+      font-size: 13px;
+      margin: 0;
+    }
+    
+    .button-container {
+      text-align: center;
+      margin: 30px 0;
+    }
+    
+    .button {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 32px;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: 600;
+      margin: 5px 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .button-secondary {
+      background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    }
+    
+    .info-section {
+      background: #f7fafc;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 25px 0;
+    }
+    
+    .info-section h4 {
+      color: #2d3748;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    
+    .info-list {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .info-list li {
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+    
+    .info-list li .emoji {
+      font-size: 18px;
+      width: 28px;
+    }
+    
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, #e2e8f0, #cbd5e0, #e2e8f0);
+      margin: 25px 0;
+    }
+    
+    .tips-box {
+      background: #e6f7ff;
+      border: 1px solid #bae7ff;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .tips-box h4 {
+      color: #0050b3;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .footer {
+      background: #f7fafc;
+      padding: 30px;
+      text-align: center;
+      font-size: 12px;
+      color: #718096;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .footer p {
+      margin: 8px 0;
+    }
+    
+    .footer a {
+      color: #764ba2;
+      text-decoration: none;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    @media (max-width: 600px) {
+      .container {
+        border-radius: 0;
+      }
+      
+      .content {
+        padding: 30px 20px;
+      }
+      
+      .header {
+        padding: 30px 20px;
+      }
+      
+      .button {
+        display: block;
+        margin: 10px 0;
+      }
+      
+      .credential-value {
+        font-size: 14px;
+      }
+      
+      .temp-password .credential-value {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div style="padding: 20px 10px;">
+    <div class="container">
+      <!-- Header Section -->
+      <div class="header">
+        <h1>🎬 Welcome to NYBFF!</h1>
+        <p>Your creative journey begins here</p>
+      </div>
+      
+      <!-- Content Section -->
+      <div class="content">
+        <!-- Greeting -->
+        <div class="greeting">
+          Hello <strong>{{userName}}</strong>,
+        </div>
+        
+        <p style="margin-bottom: 20px;">
+          Thank you for creating an account with the <strong>New York Bengali Film Festival (NYBFF)</strong>. 
+          We're thrilled to have you as part of our creative community of filmmakers, artists, and storytellers!
+        </p>
+        
+        <!-- Credentials Box -->
+        <div class="credentials-box">
+          <h3>
+            🔐 Your Account Credentials
+          </h3>
+          
+          <div class="credential-item">
+            <div class="credential-label">📧 Email Address</div>
+            <div class="credential-value">{{userEmail}}</div>
+          </div>
+          
+          <div class="credential-item temp-password">
+            <div class="credential-label">🔑 Temporary Password</div>
+            <div class="credential-value">{{tempPassword}}</div>
+          </div>
+          
+          <p style="margin-top: 15px; font-size: 13px; color: #764ba2;">
+            ⭐ <strong>Save these credentials</strong> - You'll need them to access your account
+          </p>
+        </div>
+        
+        <!-- Security Warning -->
+        <div class="security-warning">
+          <div class="icon">⚠️</div>
+          <div class="text">
+            <strong>Important Security Notice</strong>
+            <p>This is a temporary password. For your security, please change it after your first login.</p>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="button-container">
+          <a href="{{loginLink}}" class="button">🔑 Login to Your Account</a>
+          <a href="{{resetLink}}" class="button button-secondary">🔄 Change Password</a>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <!-- What You Can Do Section -->
+        <div class="info-section">
+          <h4>✨ What You Can Do Next:</h4>
+          <ul class="info-list">
+            <li>
+              <span class="emoji">📝</span>
+              <span><strong>Submit Film Projects</strong> - Share your creative work with our community</span>
+            </li>
+            <li>
+              <span class="emoji">🎯</span>
+              <span><strong>Track Submission Status</strong> - Monitor your project's review progress</span>
+            </li>
+            <li>
+              <span class="emoji">📧</span>
+              <span><strong>Receive Updates</strong> - Get notified about submission decisions</span>
+            </li>
+            <li>
+              <span class="emoji">🎪</span>
+              <span><strong>Discover Events</strong> - Stay informed about upcoming festivals</span>
+            </li>
+            <li>
+              <span class="emoji">👥</span>
+              <span><strong>Network</strong> - Connect with other filmmakers and industry professionals</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <!-- Account Information -->
+        <div class="info-section">
+          <h4>📋 Your Account Information:</h4>
+          <ul class="info-list">
+            <li>
+              <span class="emoji">📅</span>
+              <span><strong>Account Created:</strong> {{accountCreated}}</span>
+            </li>
+            <li>
+              <span class="emoji">👤</span>
+              <span><strong>Account Type:</strong> Filmmaker / Submitter</span>
+            </li>
+            <li>
+              <span class="emoji">⏳</span>
+              <span><strong>Verification Status:</strong> Pending (You'll receive a verification email soon)</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <!-- Pro Tips Section -->
+        <div class="tips-box">
+          <h4>
+            💡 Pro Tips for Success
+          </h4>
+          <ul class="info-list">
+            <li>
+              <span class="emoji">🔒</span>
+              <span><strong>Change your password</strong> immediately after first login for security</span>
+            </li>
+            <li>
+              <span class="emoji">📱</span>
+              <span><strong>Save this email</strong> for future reference - it contains your credentials</span>
+            </li>
+            <li>
+              <span class="emoji">⭐</span>
+              <span><strong>Complete your profile</strong> to increase your chances of selection</span>
+            </li>
+            <li>
+              <span class="emoji">📧</span>
+              <span><strong>Add noreply@nybff.com</strong> to your contacts to avoid missing important emails</span>
+            </li>
+            <li>
+              <span class="emoji">🎬</span>
+              <span><strong>Submit early</strong> - Early submissions have better review opportunities</span>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Help Section -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 25px 0;">
+          <p style="margin: 0; font-size: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="font-size: 24px;">❓</span>
+            <span>
+              <strong>Need Help?</strong><br>
+              If you have any questions or didn't request this account, please contact our support team at 
+              <a href="mailto:support@nybff.com" style="color: #16a34a; text-decoration: none;">support@nybff.com</a>
+            </span>
+          </p>
+        </div>
+        
+        <!-- Closing Message -->
+        <div style="margin-top: 30px; text-align: center;">
+          <p style="font-size: 14px;">
+            We look forward to seeing your amazing work!
+          </p>
+        </div>
+        
+        <p style="margin-top: 25px;">
+          Best regards,<br>
+          <strong style="color: #764ba2; font-size: 16px;">NYBFF Team</strong><br>
+          <span style="font-size: 12px; color: #718096;">New York Bengali Film Festival</span>
+        </p>
+      </div>
+      
+      <!-- Footer Section -->
+      <div class="footer">
+        <p>&copy; {{year}} NYBFF. All rights reserved.</p>
+        <p>This is an automated message, please do not reply to this email.</p>
+        <p style="margin-top: 10px;">
+          <a href="{{unsubscribeLink}}" style="color: #718096;">Unsubscribe</a> | 
+          <a href="{{privacyLink}}" style="color: #718096;">Privacy Policy</a> | 
+          <a href="{{termsLink}}" style="color: #718096;">Terms of Service</a>
+        </p>
+        <p style="margin-top: 15px; font-size: 11px;">
+          NYBFF | New York Bengali Film Festival
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

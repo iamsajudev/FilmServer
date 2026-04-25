@@ -38,7 +38,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ✅ Import models from models folder (NO NEED TO REDEFINE SCHEMAS!)
+// ✅ Import models from models folder
 const User = require("./models/User");
 const Project = require("./models/Project");
 const Film = require("./models/Film");
@@ -46,6 +46,12 @@ const Submission = require("./models/Submission");
 
 // ✅ Import Email Service
 const emailService = require("./services/emailService");
+
+// ✅ Import Route Files
+const projectRoutes = require("./routes/projectRoutes");
+const userRoutes = require("./routes/userRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // ✅ MongoDB Connection Function
 const connectDB = async () => {
@@ -57,15 +63,13 @@ const connectDB = async () => {
       throw new Error("MONGODB_URI is not defined in environment variables");
     }
 
-    // Log masked URI for debugging
     const maskedURI = mongoURI.replace(/\/\/([^:]+):([^@]+)@/, "//***:***@");
     console.log("Connection string:", maskedURI);
 
-    // Connection options for better reliability
     const options = {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
-      family: 4, // Use IPv4
+      family: 4,
       retryWrites: true,
       w: "majority",
       maxPoolSize: 10,
@@ -194,17 +198,15 @@ async function sendConfirmationEmails(
   console.log("To:", userEmail, "Project:", projectTitle);
 
   try {
-    // Send to user using template
-    const userResult = await emailService.sendSubmissionConfirmation(
+    await emailService.sendSubmissionConfirmation(
       userEmail,
       userName,
       projectTitle,
       projectId
     );
 
-    // Send to admin if email is configured
     if (process.env.ADMIN_EMAIL) {
-      const adminResult = await emailService.sendAdminNotification(
+      await emailService.sendAdminNotification(
         process.env.ADMIN_EMAIL,
         userName,
         userEmail,
@@ -287,7 +289,7 @@ const startServer = async () => {
     // ✅ Create admin user after DB connection
     await createAdminUser();
 
-    // ==================== TEST EMAIL ROUTE (FOR POSTMAN) ====================
+    // ==================== TEST EMAIL ROUTE ====================
     app.post("/api/test-email", async (req, res) => {
       try {
         const { email, name } = req.body;
@@ -326,8 +328,16 @@ const startServer = async () => {
       }
     });
 
-    // ==================== AUTH ROUTES ====================
+    // ==================== ROUTE REGISTRATIONS ====================
+    console.log("📋 Registering routes...");
+    
+    // Register all route files
+    app.use("/api/projects", projectRoutes);
+    app.use("/api/users", userRoutes);
+    app.use("/api/admin", adminRoutes);
+    app.use("/api/payments", paymentRoutes);
 
+    // ==================== AUTH ROUTES ====================
     app.post("/api/auth/register", async (req, res) => {
       try {
         const { name, email, password } = req.body;
@@ -469,201 +479,195 @@ const startServer = async () => {
     });
 
     // ==================== USER PROFILE ROUTES ====================
+    // app.get("/api/users/profile", authMiddleware, async (req, res) => {
+    //   try {
+    //     const user = await User.findById(req.user._id).select("-password");
 
-    app.get("/api/users/profile", authMiddleware, async (req, res) => {
-      try {
-        const user = await User.findById(req.user._id).select("-password");
+    //     if (!user) {
+    //       return res.status(404).json({
+    //         success: false,
+    //         message: "User not found",
+    //       });
+    //     }
 
-        if (!user) {
-          return res.status(404).json({
-            success: false,
-            message: "User not found",
-          });
-        }
+    //     const profileData = {
+    //       id: user._id,
+    //       name: user.name || user.fullName || "",
+    //       fullName: user.fullName || user.name || "",
+    //       username: user.username || user.email.split("@")[0],
+    //       title: user.title || "Filmmaker",
+    //       bio: user.bio || "",
+    //       location: user.location || "",
+    //       email: user.email,
+    //       phone: user.phone || "",
+    //       website: user.website || "",
+    //       joined: user.createdAt,
+    //       avatar: user.avatar || user.profileImage || "",
+    //       coverPhoto: user.coverPhoto || "",
+    //       socials: user.socialMedia || {},
+    //       skills: user.skills || [],
+    //       experience: user.experience || [],
+    //       education: user.education || [],
+    //       stats: user.stats || {
+    //         projects: 0,
+    //         submissions: 0,
+    //         selections: 0,
+    //         awards: 0,
+    //         followers: 0,
+    //         following: 0,
+    //       },
+    //     };
 
-        const profileData = {
-          id: user._id,
-          name: user.name || user.fullName || "",
-          fullName: user.fullName || user.name || "",
-          username: user.username || user.email.split("@")[0],
-          title: user.title || "Filmmaker",
-          bio: user.bio || "",
-          location: user.location || "",
-          email: user.email,
-          phone: user.phone || "",
-          website: user.website || "",
-          joined: user.createdAt,
-          avatar: user.avatar || user.profileImage || "",
-          coverPhoto: user.coverPhoto || "",
-          socials: user.socialMedia || {},
-          skills: user.skills || [],
-          experience: user.experience || [],
-          education: user.education || [],
-          stats: user.stats || {
-            projects: 0,
-            submissions: 0,
-            selections: 0,
-            awards: 0,
-            followers: 0,
-            following: 0,
-          },
-        };
+    //     res.json({
+    //       success: true,
+    //       data: profileData,
+    //       user: profileData,
+    //     });
+    //   } catch (error) {
+    //     console.error("Get profile error:", error);
+    //     res.status(500).json({
+    //       success: false,
+    //       message: "Error fetching profile",
+    //     });
+    //   }
+    // });
 
-        res.json({
-          success: true,
-          data: profileData,
-          user: profileData,
-        });
-      } catch (error) {
-        console.error("Get profile error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error fetching profile",
-        });
-      }
-    });
+    // app.put("/api/users/profile", authMiddleware, async (req, res) => {
+    //   try {
+    //     const currentUser = await User.findById(req.user._id);
+    //     if (!currentUser) {
+    //       return res.status(404).json({
+    //         success: false,
+    //         message: "User not found",
+    //       });
+    //     }
 
-    app.put("/api/users/profile", authMiddleware, async (req, res) => {
-      try {
-        const currentUser = await User.findById(req.user._id);
-        if (!currentUser) {
-          return res.status(404).json({
-            success: false,
-            message: "User not found",
-          });
-        }
+    //     const updates = req.body;
+    //     const updateData = { updatedAt: Date.now() };
 
-        const updates = req.body;
-        const updateData = { updatedAt: Date.now() };
+    //     const fieldMappings = [
+    //       "fullName",
+    //       "name",
+    //       "username",
+    //       "title",
+    //       "bio",
+    //       "location",
+    //       "email",
+    //       "phone",
+    //       "website",
+    //     ];
+    //     fieldMappings.forEach((field) => {
+    //       if (updates[field] !== undefined) {
+    //         updateData[field] = updates[field];
+    //       }
+    //     });
 
-        const fieldMappings = [
-          "fullName",
-          "name",
-          "username",
-          "title",
-          "bio",
-          "location",
-          "email",
-          "phone",
-          "website",
-        ];
-        fieldMappings.forEach((field) => {
-          if (updates[field] !== undefined) {
-            updateData[field] = updates[field];
-          }
-        });
+    //     if (updates.skills !== undefined) {
+    //       updateData.skills = Array.isArray(updates.skills) ? updates.skills : [];
+    //     }
 
-        if (updates.skills !== undefined) {
-          updateData.skills = Array.isArray(updates.skills)
-            ? updates.skills
-            : [];
-        }
+    //     if (updates.experience !== undefined) {
+    //       updateData.experience = Array.isArray(updates.experience) ? updates.experience : [];
+    //     }
 
-        if (updates.experience !== undefined) {
-          updateData.experience = Array.isArray(updates.experience)
-            ? updates.experience
-            : [];
-        }
+    //     if (updates.socials) {
+    //       updateData.socialMedia = updates.socials;
+    //     }
 
-        if (updates.socials) {
-          updateData.socialMedia = updates.socials;
-        }
+    //     if (updates.avatar && updates.avatar.startsWith("data:image")) {
+    //       updateData.avatar = updates.avatar;
+    //       updateData.profileImage = updates.avatar;
+    //     }
 
-        if (updates.avatar && updates.avatar.startsWith("data:image")) {
-          updateData.avatar = updates.avatar;
-          updateData.profileImage = updates.avatar;
-        }
+    //     if (updates.coverPhoto && updates.coverPhoto.startsWith("data:image")) {
+    //       updateData.coverPhoto = updates.coverPhoto;
+    //     }
 
-        if (updates.coverPhoto && updates.coverPhoto.startsWith("data:image")) {
-          updateData.coverPhoto = updates.coverPhoto;
-        }
+    //     if (updates.password && updates.password.trim() !== "") {
+    //       if (updates.password.length < 6) {
+    //         return res.status(400).json({
+    //           success: false,
+    //           message: "Password must be at least 6 characters",
+    //         });
+    //       }
+    //       const salt = await bcrypt.genSalt(10);
+    //       updateData.password = await bcrypt.hash(updates.password, salt);
+    //     }
 
-        if (updates.password && updates.password.trim() !== "") {
-          if (updates.password.length < 6) {
-            return res.status(400).json({
-              success: false,
-              message: "Password must be at least 6 characters",
-            });
-          }
-          const salt = await bcrypt.genSalt(10);
-          updateData.password = await bcrypt.hash(updates.password, salt);
-        }
+    //     const user = await User.findByIdAndUpdate(req.user._id, updateData, {
+    //       new: true,
+    //       runValidators: true,
+    //     }).select("-password");
 
-        const user = await User.findByIdAndUpdate(req.user._id, updateData, {
-          new: true,
-          runValidators: true,
-        }).select("-password");
+    //     const profileData = {
+    //       id: user._id,
+    //       name: user.name || user.fullName || "",
+    //       fullName: user.fullName || user.name || "",
+    //       username: user.username,
+    //       title: user.title,
+    //       bio: user.bio,
+    //       location: user.location,
+    //       email: user.email,
+    //       phone: user.phone,
+    //       website: user.website,
+    //       avatar: user.avatar || user.profileImage || "",
+    //       coverPhoto: user.coverPhoto || "",
+    //       socials: user.socialMedia || {},
+    //       skills: user.skills || [],
+    //       experience: user.experience || [],
+    //       education: user.education || [],
+    //       stats: user.stats || {},
+    //       joined: user.createdAt,
+    //     };
 
-        const profileData = {
-          id: user._id,
-          name: user.name || user.fullName || "",
-          fullName: user.fullName || user.name || "",
-          username: user.username,
-          title: user.title,
-          bio: user.bio,
-          location: user.location,
-          email: user.email,
-          phone: user.phone,
-          website: user.website,
-          avatar: user.avatar || user.profileImage || "",
-          coverPhoto: user.coverPhoto || "",
-          socials: user.socialMedia || {},
-          skills: user.skills || [],
-          experience: user.experience || [],
-          education: user.education || [],
-          stats: user.stats || {},
-          joined: user.createdAt,
-        };
+    //     res.json({
+    //       success: true,
+    //       message: "Profile updated successfully",
+    //       user: profileData,
+    //       data: profileData,
+    //     });
+    //   } catch (error) {
+    //     console.error("Update profile error:", error);
+    //     res.status(500).json({
+    //       success: false,
+    //       message: error.message || "Error updating profile",
+    //     });
+    //   }
+    // });
 
-        res.json({
-          success: true,
-          message: "Profile updated successfully",
-          user: profileData,
-          data: profileData,
-        });
-      } catch (error) {
-        console.error("Update profile error:", error);
-        res.status(500).json({
-          success: false,
-          message: error.message || "Error updating profile",
-        });
-      }
-    });
+    // app.get("/api/users/:id", authMiddleware, async (req, res) => {
+    //   try {
+    //     const user = await User.findById(req.params.id).select("-password");
+    //     if (!user) {
+    //       return res.status(404).json({
+    //         success: false,
+    //         message: "User not found",
+    //       });
+    //     }
 
-    app.get("/api/users/:id", authMiddleware, async (req, res) => {
-      try {
-        const user = await User.findById(req.params.id).select("-password");
-        if (!user) {
-          return res.status(404).json({
-            success: false,
-            message: "User not found",
-          });
-        }
-
-        res.json({
-          success: true,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            avatar: user.avatar || user.profileImage,
-            bio: user.bio,
-            location: user.location,
-            joined: user.createdAt,
-          },
-        });
-      } catch (error) {
-        console.error("Get user error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error fetching user",
-        });
-      }
-    });
+    //     res.json({
+    //       success: true,
+    //       user: {
+    //         id: user._id,
+    //         name: user.name,
+    //         email: user.email,
+    //         role: user.role,
+    //         avatar: user.avatar || user.profileImage,
+    //         bio: user.bio,
+    //         location: user.location,
+    //         joined: user.createdAt,
+    //       },
+    //     });
+    //   } catch (error) {
+    //     console.error("Get user error:", error);
+    //     res.status(500).json({
+    //       success: false,
+    //       message: "Error fetching user",
+    //     });
+    //   }
+    // });
 
     // ==================== ADMIN USER MANAGEMENT ROUTES ====================
-
     app.get(
       "/api/admin/users",
       authMiddleware,
@@ -771,8 +775,7 @@ const startServer = async () => {
 
           res.json({
             success: true,
-            message: `User ${isActive ? "activated" : "deactivated"
-              } successfully`,
+            message: `User ${isActive ? "activated" : "deactivated"} successfully`,
           });
         } catch (error) {
           console.error("Update status error:", error);
@@ -818,7 +821,6 @@ const startServer = async () => {
     );
 
     // ==================== ADMIN SUBMISSION MANAGEMENT ROUTES ====================
-
     app.get(
       "/api/admin/submissions",
       authMiddleware,
@@ -858,8 +860,7 @@ const startServer = async () => {
               briefSynopsis: subObj.description,
               email: subObj.submitterEmail,
               submitterName: sub.submittedBy?.name || "Unknown User",
-              submitterEmail:
-                sub.submittedBy?.email || subObj.submitterEmail || "No email",
+              submitterEmail: sub.submittedBy?.email || subObj.submitterEmail || "No email",
               submissionStatus: subObj.status,
               userId: sub.submittedBy,
             };
@@ -931,10 +932,7 @@ const startServer = async () => {
         try {
           const { status, adminNotes } = req.body;
 
-          if (
-            !status ||
-            !["pending", "in-review", "approved", "rejected"].includes(status)
-          ) {
+          if (!status || !["pending", "in-review", "approved", "rejected"].includes(status)) {
             return res.status(400).json({
               success: false,
               message: "Valid status is required",
@@ -1009,7 +1007,6 @@ const startServer = async () => {
       }
     );
 
-    // Get submission statistics (Admin only)
     app.get(
       "/api/admin/submissions/stats",
       authMiddleware,
@@ -1017,34 +1014,17 @@ const startServer = async () => {
       async (req, res) => {
         try {
           const total = await Project.countDocuments();
-          const pending = await Project.countDocuments({
-            status: "pending",
-          });
-          const inReview = await Project.countDocuments({
-            status: "in-review",
-          });
-          const approved = await Project.countDocuments({
-            status: "approved",
-          });
-          const rejected = await Project.countDocuments({
-            status: "rejected",
-          });
+          const pending = await Project.countDocuments({ status: "pending" });
+          const inReview = await Project.countDocuments({ status: "in-review" });
+          const approved = await Project.countDocuments({ status: "approved" });
+          const rejected = await Project.countDocuments({ status: "rejected" });
 
-          // Get submissions by month (last 6 months)
           const last6Months = [];
           for (let i = 5; i >= 0; i--) {
             const date = new Date();
             date.setMonth(date.getMonth() - i);
-            const startOfMonth = new Date(
-              date.getFullYear(),
-              date.getMonth(),
-              1
-            );
-            const endOfMonth = new Date(
-              date.getFullYear(),
-              date.getMonth() + 1,
-              0
-            );
+            const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+            const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
             const count = await Project.countDocuments({
               createdAt: { $gte: startOfMonth, $lte: endOfMonth },
@@ -1078,7 +1058,6 @@ const startServer = async () => {
       }
     );
 
-    // Bulk update submissions status (Admin only)
     app.post(
       "/api/admin/submissions/bulk-update",
       authMiddleware,
@@ -1087,21 +1066,14 @@ const startServer = async () => {
         try {
           const { submissionIds, status } = req.body;
 
-          if (
-            !submissionIds ||
-            !Array.isArray(submissionIds) ||
-            submissionIds.length === 0
-          ) {
+          if (!submissionIds || !Array.isArray(submissionIds) || submissionIds.length === 0) {
             return res.status(400).json({
               success: false,
               message: "Submission IDs array is required",
             });
           }
 
-          if (
-            !status ||
-            !["pending", "in-review", "approved", "rejected"].includes(status)
-          ) {
+          if (!status || !["pending", "in-review", "approved", "rejected"].includes(status)) {
             return res.status(400).json({
               success: false,
               message: "Valid status is required",
@@ -1134,356 +1106,62 @@ const startServer = async () => {
       }
     );
 
-    // ==================== PROJECT ROUTES ====================
-
-    // Get user's own projects
-    app.get("/api/projects/user/list", authMiddleware, async (req, res) => {
-      try {
-        const projects = await Project.find({
-          submittedBy: req.user._id,
-        }).sort({ createdAt: -1 });
-        res.json({ success: true, count: projects.length, projects });
-      } catch (error) {
-        console.error("Get user projects error:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Error fetching your projects" });
-      }
-    });
-
-    // Get all projects (public)
-    app.get("/api/projects", async (req, res) => {
-      try {
-        const { status, category, page = 1, limit = 10 } = req.query;
-        const query = {};
-        if (status) query.status = status;
-        if (category) query.category = category;
-
-        const projects = await Project.find(query)
-          .populate("submittedBy", "name email")
-          .sort({ createdAt: -1 })
-          .limit(limit * 1)
-          .skip((page - 1) * limit);
-
-        const total = await Project.countDocuments(query);
-
-        res.json({
-          success: true,
-          projects,
-          totalPages: Math.ceil(total / limit),
-          currentPage: parseInt(page),
-          total,
-        });
-      } catch (error) {
-        console.error("Get projects error:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Error fetching projects" });
-      }
-    });
-
-    // Create new project
-    app.post("/api/projects", authMiddleware, async (req, res) => {
-      try {
-        let title, description, category, director;
-
-        if (req.body.projectTitle) {
-          title = req.body.projectTitle;
-          description = req.body.briefSynopsis;
-          category = req.body.projectType;
-          if (req.body.directors && req.body.directors.length > 0) {
-            const firstDirector = req.body.directors[0];
-            director = `${firstDirector.firstName || ""
-              } ${firstDirector.lastName || ""}`.trim();
-          }
-          if (!director) director = req.body.director || "Not specified";
-        } else {
-          title = req.body.title;
-          description = req.body.description;
-          category = req.body.category;
-          director = req.body.director;
-        }
-
-        if (!title || !description || !category || !director) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Please provide title, description, category, and director",
-          });
-        }
-
-        const project = new Project({
-          title,
-          description,
-          category,
-          director,
-          hasNonEnglishTitle: req.body.hasNonEnglishTitle || false,
-          nonEnglishTitle: req.body.nonEnglishTitle || "",
-          nonEnglishSynopsis: req.body.nonEnglishSynopsis || "",
-          website: req.body.website || "",
-          twitter: req.body.twitter || "",
-          facebook: req.body.facebook || "",
-          instagram: req.body.instagram || "",
-          submitterEmail: req.body.email || "",
-          submitterPhone: req.body.phone || "",
-          submitterAddress: req.body.address || "",
-          submitterCity: req.body.city || "",
-          submitterStateProvince: req.body.stateProvince || "",
-          submitterPostalCode: req.body.postalCode || "",
-          submitterCountry: req.body.country || "",
-          submitterBirthDate: req.body.birthDate || "",
-          submitterGender: req.body.gender || "",
-          submitterPronouns: req.body.pronouns || "",
-          directors: req.body.directors || [],
-          writers: req.body.writers || [],
-          producers: req.body.producers || [],
-          keyCast: req.body.keyCast || [],
-          projectTypes: req.body.projectTypes || [],
-          genres: req.body.genres || "",
-          runtimeHours: req.body.runtimeHours || "00",
-          runtimeMinutes: req.body.runtimeMinutes || "00",
-          runtimeSeconds: req.body.runtimeSeconds || "00",
-          completionDate: req.body.completionDate || "",
-          productionBudget: req.body.productionBudget || "",
-          countryOfOrigin: req.body.countryOfOrigin || "",
-          countryOfFilming: req.body.countryOfFilming || "",
-          language: req.body.language || "en",
-          shootingFormat: req.body.shootingFormat || "",
-          aspectRatio: req.body.aspectRatio || "16:9",
-          filmColor: req.body.filmColor || "Color",
-          studentProject: req.body.studentProject || "No",
-          firstTimeFilmmaker: req.body.firstTimeFilmmaker || "No",
-          screenings: req.body.screenings || [],
-          distributors: req.body.distributors || [],
-          paymentIntentId: req.body.paymentIntentId || "",
-          submittedAt: req.body.submittedAt || new Date().toISOString(),
-          submittedBy: req.user._id,
-          status: "pending",
-        });
-
-        await project.save();
-        await sendConfirmationEmails(
-          req.body.email || req.user.email,
-          req.user.name,
-          req.body.projectTitle || req.body.title || "Project",
-          project._id
-        );
-
-        res.status(201).json({
-          success: true,
-          message: "Project submitted successfully",
-          project,
-        });
-      } catch (error) {
-        console.error("Create project error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error creating project submission",
-        });
-      }
-    });
-
-    // Get user's own projects (alias for /my-projects)
-    app.get("/api/projects/my-projects", authMiddleware, async (req, res) => {
-      try {
-        const projects = await Project.find({
-          submittedBy: req.user._id,
-        }).sort({ createdAt: -1 });
-
-        res.json({
-          success: true,
-          count: projects.length,
-          projects,
-        });
-      } catch (error) {
-        console.error("Get my projects error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error fetching your projects",
-        });
-      }
-    });
-
-    // Get single project
-    app.get("/api/projects/:id", async (req, res) => {
-      try {
-        const project = await Project.findById(req.params.id).populate(
-          "submittedBy",
-          "name email"
-        );
-
-        if (!project) {
-          return res.status(404).json({
-            success: false,
-            message: "Project not found",
-          });
-        }
-
-        res.json({
-          success: true,
-          project,
-        });
-      } catch (error) {
-        console.error("Get project error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error fetching project",
-        });
-      }
-    });
-
-    // Update project
-    app.put("/api/projects/:id", authMiddleware, async (req, res) => {
-      try {
-        const project = await Project.findById(req.params.id);
-
-        if (!project) {
-          return res.status(404).json({
-            success: false,
-            message: "Project not found",
-          });
-        }
-
-        if (
-          project.submittedBy.toString() !== req.user._id.toString() &&
-          req.user.role !== "admin"
-        ) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only update your own projects",
-          });
-        }
-
-        const updates = req.body;
-        updates.updatedAt = Date.now();
-
-        const updatedProject = await Project.findByIdAndUpdate(
-          req.params.id,
-          updates,
-          { new: true, runValidators: true }
-        );
-
-        res.json({
-          success: true,
-          message: "Project updated successfully",
-          project: updatedProject,
-        });
-      } catch (error) {
-        console.error("Update project error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error updating project",
-        });
-      }
-    });
-
-    // Delete project
-    app.delete("/api/projects/:id", authMiddleware, async (req, res) => {
-      try {
-        const project = await Project.findById(req.params.id);
-
-        if (!project) {
-          return res.status(404).json({
-            success: false,
-            message: "Project not found",
-          });
-        }
-
-        if (
-          project.submittedBy.toString() !== req.user._id.toString() &&
-          req.user.role !== "admin"
-        ) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only delete your own projects",
-          });
-        }
-
-        await Project.findByIdAndDelete(req.params.id);
-
-        res.json({
-          success: true,
-          message: "Project deleted successfully",
-        });
-      } catch (error) {
-        console.error("Delete project error:", error);
-        res.status(500).json({
-          success: false,
-          message: "Error deleting project",
-        });
-      }
-    });
-
     // ==================== PAYMENT ROUTES ====================
-
     app.post(
       "/api/payments/create-payment-intent",
       authMiddleware,
       async (req, res) => {
         try {
-          const { amount = 2500, currency = "usd" } = req.body; // 2500 cents = $25.00
+          const { amount = 2500, currency = "usd", metadata = {} } = req.body;
 
-          console.log(
-            `Creating payment intent for user ${req.user._id}: $${amount / 100
-            } ${currency}`
-          );
+          console.log(`💰 Creating payment intent for user ${req.user._id}: $${(amount / 100).toFixed(2)} ${currency}`);
 
-          // Check if Stripe secret key is configured
           if (!process.env.STRIPE_SECRET_KEY) {
-            console.warn("⚠️ STRIPE_SECRET_KEY not set. Using mock payment.");
-            // Return mock for testing
-            return res.json({
-              clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
-              mock: true,
+            console.error("❌ STRIPE_SECRET_KEY missing");
+            return res.status(500).json({
+              success: false,
+              message: "Payment system not configured"
             });
           }
 
           const Stripe = require("stripe");
           const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
+          const keyPrefix = process.env.STRIPE_SECRET_KEY.substring(0, 7);
+          console.log(`🔑 Stripe mode: ${keyPrefix === 'sk_test' ? 'TEST' : 'LIVE'}`);
+
           const paymentIntent = await stripe.paymentIntents.create({
             amount: parseInt(amount),
-            currency: currency,
+            currency: currency.toLowerCase(),
             metadata: {
               userId: req.user._id.toString(),
               userEmail: req.user.email,
-              projectType: req.body.projectType || "unknown",
+              ...metadata
             },
             automatic_payment_methods: {
               enabled: true,
             },
           });
 
-          console.log(`✅ Payment intent created: ${paymentIntent.id}`);
+          console.log(`✅ Payment intent: ${paymentIntent.id}`);
 
           res.json({
+            success: true,
             clientSecret: paymentIntent.client_secret,
             paymentIntentId: paymentIntent.id,
-            mock: false,
+            mode: keyPrefix === 'sk_test' ? 'test' : 'live'
           });
         } catch (error) {
-          console.error("❌ Payment intent error:", error.message);
-
-          // For development, return mock to allow testing
-          if (process.env.NODE_ENV === "development") {
-            console.log("⚠️ Using mock payment intent for development");
-            res.json({
-              clientSecret: `mock_secret_${Date.now()}_${req.user._id}`,
-              mock: true,
-              error: error.message,
-            });
-          } else {
-            res.status(500).json({
-              success: false,
-              message: error.message || "Failed to create payment intent",
-            });
-          }
+          console.error("❌ Payment error:", error);
+          res.status(500).json({
+            success: false,
+            message: error.message
+          });
         }
       }
     );
 
     // ==================== FILM ROUTES ====================
-
     app.get("/api/films", async (req, res) => {
       try {
         const { status, genre, page = 1, limit = 10 } = req.query;
@@ -1656,7 +1334,6 @@ const startServer = async () => {
     });
 
     // ==================== DASHBOARD STATS ROUTES ====================
-
     app.get(
       "/api/admin/stats",
       authMiddleware,
@@ -1667,18 +1344,10 @@ const startServer = async () => {
           const activeUsers = await User.countDocuments({ isActive: true });
           const totalAdmins = await User.countDocuments({ role: "admin" });
           const totalProjects = await Project.countDocuments();
-          const pendingProjects = await Project.countDocuments({
-            status: "pending",
-          });
-          const approvedProjects = await Project.countDocuments({
-            status: "approved",
-          });
-          const rejectedProjects = await Project.countDocuments({
-            status: "rejected",
-          });
-          const inReviewProjects = await Project.countDocuments({
-            status: "in-review",
-          });
+          const pendingProjects = await Project.countDocuments({ status: "pending" });
+          const approvedProjects = await Project.countDocuments({ status: "approved" });
+          const rejectedProjects = await Project.countDocuments({ status: "rejected" });
+          const inReviewProjects = await Project.countDocuments({ status: "in-review" });
 
           res.json({
             success: true,
@@ -1751,9 +1420,7 @@ const startServer = async () => {
       adminMiddleware,
       async (req, res) => {
         try {
-          const pendingSubmissions = await Project.countDocuments({
-            status: "pending",
-          });
+          const pendingSubmissions = await Project.countDocuments({ status: "pending" });
           const pendingUsers = await User.countDocuments({ isActive: false });
 
           const tasks = [];
@@ -1761,12 +1428,7 @@ const startServer = async () => {
             tasks.push({
               task: "Review new submissions",
               count: pendingSubmissions,
-              priority:
-                pendingSubmissions > 10
-                  ? "high"
-                  : pendingSubmissions > 5
-                    ? "medium"
-                    : "low",
+              priority: pendingSubmissions > 10 ? "high" : pendingSubmissions > 5 ? "medium" : "low",
               link: "/admin/submissions",
             });
           }
@@ -1774,12 +1436,7 @@ const startServer = async () => {
             tasks.push({
               task: "Verify new users",
               count: pendingUsers,
-              priority:
-                pendingUsers > 10
-                  ? "high"
-                  : pendingUsers > 5
-                    ? "medium"
-                    : "low",
+              priority: pendingUsers > 10 ? "high" : pendingUsers > 5 ? "medium" : "low",
               link: "/admin/users",
             });
           }
@@ -1792,139 +1449,7 @@ const startServer = async () => {
       }
     );
 
-    // ==================== PROJECT SUBMISSION ROUTE ====================
-
-    // ==================== PROJECT SUBMISSION ROUTE ====================
-
-    // ==================== PROJECT SUBMISSION ROUTE ====================
-
-    app.post("/api/projects/submit", authMiddleware, async (req, res) => {
-      try {
-        const submissionData = req.body;
-
-        console.log("📝 Received submission:", JSON.stringify(submissionData, null, 2));
-
-        // Validate required fields according to your schema
-        if (!submissionData.projectTitle) {
-          return res.status(400).json({
-            success: false,
-            message: "projectTitle is required"
-          });
-        }
-
-        if (!submissionData.briefSynopsis) {
-          return res.status(400).json({
-            success: false,
-            message: "briefSynopsis is required"
-          });
-        }
-
-        if (!submissionData.projectType) {
-          return res.status(400).json({
-            success: false,
-            message: "projectType is required"
-          });
-        }
-
-        if (!submissionData.email) {
-          return res.status(400).json({
-            success: false,
-            message: "email is required"
-          });
-        }
-
-        // Create project with your schema fields
-        const project = new Project({
-          // Step 1: Project Information
-          projectType: submissionData.projectType,
-          projectTitle: submissionData.projectTitle,
-          briefSynopsis: submissionData.briefSynopsis,
-          hasNonEnglishTitle: submissionData.hasNonEnglishTitle || false,
-          nonEnglishTitle: submissionData.nonEnglishTitle || "",
-          nonEnglishSynopsis: submissionData.nonEnglishSynopsis || "",
-          website: submissionData.website || "",
-          twitter: submissionData.twitter || "",
-          facebook: submissionData.facebook || "",
-          instagram: submissionData.instagram || "",
-
-          // Step 2: Submitter Information
-          email: submissionData.email,
-          phone: submissionData.phone || "",
-          address: submissionData.address || "",
-          city: submissionData.city || "",
-          stateProvince: submissionData.stateProvince || "",
-          postalCode: submissionData.postalCode || "",
-          country: submissionData.country || "",
-          birthDate: submissionData.birthDate || null,
-          gender: submissionData.gender || "",
-          pronouns: submissionData.pronouns || "",
-
-          // Step 3: Credits
-          directors: submissionData.directors || [],
-          writers: submissionData.writers || [],
-          producers: submissionData.producers || [],
-          keyCast: submissionData.keyCast || [],
-
-          // Step 4: Technical Specifications
-          projectTypes: submissionData.projectTypes || [submissionData.projectType],
-          genres: submissionData.genres || "",
-          runtimeHours: submissionData.runtimeHours || "00",
-          runtimeMinutes: submissionData.runtimeMinutes || "00",
-          runtimeSeconds: submissionData.runtimeSeconds || "00",
-          completionDate: submissionData.completionDate || null,
-          productionBudget: submissionData.productionBudget || "",
-          countryOfOrigin: submissionData.countryOfOrigin || "",
-          countryOfFilming: submissionData.countryOfFilming || "",
-          language: submissionData.language || "",
-          shootingFormat: submissionData.shootingFormat || "",
-          aspectRatio: submissionData.aspectRatio || "16:9",
-          filmColor: submissionData.filmColor || "Color",
-          studentProject: submissionData.studentProject || "No",
-          firstTimeFilmmaker: submissionData.firstTimeFilmmaker || "No",
-
-          // Step 5: Screenings & Distributors
-          screenings: submissionData.screenings || [],
-          distributors: submissionData.distributors || [],
-
-          // Step 6: Payment
-          paymentIntentId: submissionData.paymentIntentId || "",
-
-          // System Fields
-          userId: req.user._id,  // ✅ This is the required userId field
-          submissionStatus: "pending",
-          status: "pending",
-          submittedAt: new Date()
-        });
-
-        await project.save();
-
-        console.log("✅ Project saved with ID:", project._id);
-
-        // Send email confirmation
-        await sendConfirmationEmails(
-          submissionData.email,
-          req.user.name || "User",
-          submissionData.projectTitle,
-          project._id
-        );
-
-        res.status(201).json({
-          success: true,
-          message: "Project submitted successfully! Check your email for confirmation.",
-          data: project,
-        });
-
-      } catch (error) {
-        console.error("❌ Submit project error:", error);
-        res.status(500).json({
-          success: false,
-          message: error.message || "Server error",
-        });
-      }
-    });
-
     // ==================== HEALTH ROUTES ====================
-
     app.get("/", (req, res) => {
       res.status(200).json({
         success: true,
@@ -1935,8 +1460,7 @@ const startServer = async () => {
     });
 
     app.get("/health", (req, res) => {
-      const dbStatus =
-        mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+      const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
       res.status(200).json({
         success: true,
         status: "OK",
@@ -1946,7 +1470,6 @@ const startServer = async () => {
     });
 
     // ==================== ERROR HANDLERS ====================
-
     app.use((req, res) => {
       res.status(404).json({
         success: false,
@@ -1960,10 +1483,7 @@ const startServer = async () => {
       res.status(err.status || 500).json({
         success: false,
         message: err.message || "Internal Server Error",
-        error:
-          process.env.NODE_ENV === "development"
-            ? err.message
-            : "Something went wrong",
+        error: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
       });
     });
 

@@ -1,5 +1,9 @@
 const Project = require("../models/Project");
+const User = require("../models/User");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const emailService = require("../services/emailService");
 
 // @desc    Create a new project
 // @route   POST /api/projects
@@ -99,7 +103,6 @@ const getAllProjects = async (req, res) => {
 // @desc    Get user's projects
 // @route   GET /api/projects/user
 // @access  Private
-// In projectController.js
 const getUserProjects = async (req, res) => {
   try {
     console.log("=== getUserProjects called ===");
@@ -137,7 +140,6 @@ const getUserProjects = async (req, res) => {
 // @desc    Get single project
 // @route   GET /api/projects/:id
 // @access  Public
-// In projectController.js - update getProjectById
 const getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -377,15 +379,101 @@ const addReview = async (req, res) => {
   }
 };
 
-// @desc    Submit project
+// @desc    Submit project (Public - Auto-create user if needed)
 // @route   POST /api/projects/submit
-// @access  Private
+// @access  Public
 const submitProject = async (req, res) => {
   try {
-    console.log("=== New Project Submission ===");
-    console.log("User ID:", req.user.id);
+    console.log("=== New Project Submission (Public) ===");
 
     const submissionData = req.body;
+
+    console.log("Project Title:", submissionData.projectTitle);
+    console.log("Submitter Email:", submissionData.email);
+    console.log("Project Type:", submissionData.projectType);
+
+    let userId = null;
+    let isNewUser = false;
+    let authToken = null;
+    let tempPassword = null;
+
+    // Check if user already exists by email
+    let user = await User.findOne({ email: submissionData.email.toLowerCase() });
+
+    if (!user) {
+      // Create new user account automatically
+      console.log("Creating new user account for:", submissionData.email);
+
+      // Generate temporary password
+      tempPassword = emailService.generateTemporaryPassword();
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      // Generate username from email
+      let username = submissionData.email.split('@')[0];
+      // Check if username exists, if yes add random number
+      let existingUser = await User.findOne({ username: username });
+      if (existingUser) {
+        username = username + Math.floor(Math.random() * 1000);
+      }
+
+      // Create new user
+      user = new User({
+        name: submissionData.name || submissionData.email.split('@')[0],
+        fullName: submissionData.name || submissionData.email.split('@')[0],
+        email: submissionData.email.toLowerCase(),
+        password: hashedPassword,
+        username: username,
+        role: "user",
+        isActive: true,
+        isEmailVerified: false,
+        phone: submissionData.phone || "",
+        location: submissionData.country || "",
+        createdAt: new Date(),
+        stats: {
+          projects: 0,
+          submissions: 0,
+          selections: 0,
+          awards: 0
+        }
+      });
+
+      await user.save();
+      isNewUser = true;
+      console.log("✅ New user created with ID:", user._id);
+      console.log("✅ Temporary password generated for user");
+
+      // Generate JWT token for the new user
+      authToken = jwt.sign(
+        { id: user._id, email: user.email, role: user.role },
+        process.env.JWT_SECRET || "default_secret_key_change_this",
+        { expiresIn: "7d" }
+      );
+
+      // Send welcome email with temporary password
+      const emailSent = await emailService.sendWelcomeEmail(
+        user.email,
+        user.name || user.email.split('@')[0],
+        tempPassword,
+        authToken
+      );
+
+      if (emailSent) {
+        console.log("✅ Welcome email sent with temporary password");
+      } else {
+        console.log("⚠️ Welcome email failed to send");
+      }
+
+    } else {
+      console.log("Existing user found:", user._id);
+      // Generate token for existing user
+      authToken = jwt.sign(
+        { id: user._id, email: user.email, role: user.role },
+        process.env.JWT_SECRET || "default_secret_key_change_this",
+        { expiresIn: "7d" }
+      );
+    }
+
+    userId = user._id;
 
     // Create project with the exact structure from your form
     const projectData = {
@@ -444,8 +532,9 @@ const submitProject = async (req, res) => {
       paymentIntentId: submissionData.paymentIntentId,
 
       // System fields
-      userId: req.user.id,
-      submissionStatus: "submitted",
+      userId: userId,
+      submissionStatus: "pending",
+      status: "pending",
       submittedAt: new Date(),
     };
 
@@ -471,15 +560,73 @@ const submitProject = async (req, res) => {
       });
     }
 
+    if (!projectData.briefSynopsis) {
+      return res.status(400).json({
+        success: false,
+        message: "Brief synopsis is required",
+      });
+    }
+
     // Save to database
     const project = new Project(projectData);
     await project.save();
 
-    console.log("Project saved successfully with ID:", project._id);
+    console.log("✅ Project saved successfully with ID:", project._id);
+    console.log("User ID associated:", project.userId);
+
+    // Update user's stats
+    user.stats = user.stats || {};
+    user.stats.projects = (user.stats.projects || 0) + 1;
+    user.stats.submissions = (user.stats.submissions || 0) + 1;
+    await user.save();
+
+    // Send submission confirmation email
+    const confirmationSent = await emailService.sendSubmissionConfirmation(
+      submissionData.email,
+      user.name || user.email.split('@')[0],
+      submissionData.projectTitle,
+      project._id
+    );
+
+    if (confirmationSent) {
+      console.log("✅ Submission confirmation email sent");
+    }
+
+    // Send admin notification if admin email is configured
+    if (process.env.ADMIN_EMAIL) {
+      const adminNotificationSent = await emailService.sendAdminNotification(
+        process.env.ADMIN_EMAIL,
+        user.name || user.email.split('@')[0],
+        submissionData.email,
+        submissionData.projectTitle,
+        project._id
+      );
+
+      if (adminNotificationSent) {
+        console.log("✅ Admin notification email sent");
+      }
+    }
+
+    // Prepare response message
+    let responseMessage = "";
+    if (isNewUser) {
+      responseMessage = "Account created and project submitted successfully! A welcome email with your temporary password has been sent to your email address.";
+    } else {
+      responseMessage = "Project submitted successfully! You are now logged in.";
+    }
 
     res.status(201).json({
       success: true,
-      message: "Project submitted successfully",
+      message: responseMessage,
+      projectId: project._id,
+      authToken: authToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isNewUser: isNewUser
+      },
       data: {
         id: project._id,
         projectTitle: project.projectTitle,
@@ -487,8 +634,9 @@ const submitProject = async (req, res) => {
         submittedAt: project.submittedAt,
       },
     });
+
   } catch (error) {
-    console.error("Submit project error:", error);
+    console.error("❌ Submit project error:", error);
 
     // Handle validation errors
     if (error.name === "ValidationError") {
@@ -496,6 +644,14 @@ const submitProject = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: messages.join(", "),
+      });
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "A user with this email already exists. Please login first or use a different email.",
       });
     }
 
