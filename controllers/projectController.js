@@ -507,6 +507,21 @@ const submitProject = async (req, res) => {
       producers: submissionData.producers || [],
       keyCast: submissionData.keyCast || [],
 
+      // ==================== STEP 4: MEDIA & VISUALS ====================
+      // Save media link as is (YouTube/Vimeo URL)
+      mediaLink: submissionData.mediaLink || "",
+
+      // Save uploaded image as base64 string (already comes as base64 from frontend)
+      uploadedImage: submissionData.uploadedImage || "",
+
+      // Optional: Save metadata about the uploaded image
+      posterMetadata: {
+        fileName: submissionData.posterMetadata?.fileName || "",
+        fileSize: submissionData.posterMetadata?.fileSize || 0,
+        mimeType: submissionData.posterMetadata?.mimeType || "",
+        uploadedAt: submissionData.posterMetadata?.uploadedAt || new Date().toISOString()
+      },
+
       // Step 4: Specifications
       projectTypes: submissionData.projectTypes || [],
       genres: submissionData.genres || "",

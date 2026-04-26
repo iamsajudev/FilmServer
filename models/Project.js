@@ -32,7 +32,7 @@ const projectSchema = new mongoose.Schema({
     twitter: { type: String, default: '' },
     facebook: { type: String, default: '' },
     instagram: { type: String, default: '' },
-    
+
     // ==================== STEP 2: SUBMITTER INFORMATION ====================
     email: {
         type: String,
@@ -48,7 +48,7 @@ const projectSchema = new mongoose.Schema({
     birthDate: { type: Date, default: null },
     gender: { type: String, default: '' },
     pronouns: { type: String, default: '' },
-    
+
     // ==================== STEP 3: CREDITS ====================
     directors: [{
         firstName: String,
@@ -75,7 +75,43 @@ const projectSchema = new mongoose.Schema({
         role: String,
         priorCredits: String
     }],
-    
+
+    // ==================== STEP 4 (NEW): MEDIA & VISUALS ====================
+    mediaLink: {
+        type: String,
+        default: '',
+        trim: true,
+        validate: {
+            validator: function (v) {
+                if (!v) return true; // Empty is allowed
+                // Validate YouTube or Vimeo URL format
+                const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+                const vimeoRegex = /^(https?:\/\/)?(www\.)?(vimeo\.com)\/.+$/;
+                return youtubeRegex.test(v) || vimeoRegex.test(v);
+            },
+            message: 'Please enter a valid YouTube or Vimeo URL'
+        }
+    },
+    uploadedImage: {
+        type: String,
+        default: '',
+        // This will store base64 image data
+    },
+    uploadedImageFile: {
+        type: String,
+        default: '',
+        // Optional: store original file name or additional info
+    },
+
+    // If you want to store additional metadata about the uploaded image
+    posterMetadata: {
+        fileName: { type: String, default: '' },
+        fileSize: { type: Number, default: 0 },
+        mimeType: { type: String, default: '' },
+        uploadedAt: { type: Date, default: null }
+    },
+
+
     // ==================== STEP 4: TECHNICAL SPECIFICATIONS ====================
     projectTypes: [String],
     genres: { type: String, default: '' },
@@ -92,7 +128,7 @@ const projectSchema = new mongoose.Schema({
     filmColor: { type: String, default: 'Color' },
     studentProject: { type: String, default: 'No' },
     firstTimeFilmmaker: { type: String, default: 'No' },
-    
+
     // ==================== STEP 5: SCREENINGS & DISTRIBUTORS ====================
     screenings: [{
         festivalName: String,
@@ -109,10 +145,10 @@ const projectSchema = new mongoose.Schema({
         phone: String,
         territory: String
     }],
-    
+
     // ==================== STEP 6: PAYMENT ====================
     paymentIntentId: { type: String, default: '' },
-    
+
     // ==================== SYSTEM FIELDS ====================
     // ✅ FIX: Properly define userId as ObjectId reference
     userId: {
@@ -132,10 +168,10 @@ const projectSchema = new mongoose.Schema({
         default: 'pending'
     },
     adminNotes: { type: String, default: '' },
-    reviewedBy: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
-        default: null 
+    reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
     },
     reviewedAt: { type: Date, default: null },
     submittedAt: { type: Date, default: Date.now }
